@@ -50,6 +50,7 @@ pub enum GameState {
     DoubleOrRoll,
     Rolled,
     Doubled,
+    Finished,
 }
 
 #[derive(Clone, Debug, Copy, Default, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
@@ -83,8 +84,8 @@ impl Color {
         }
     }
 
-    pub fn toggle(&self) -> Color {
-        match self {
+    pub fn toggle(color: Color) -> Color {
+        match color {
             Color::None => return Color::None,
             Color::White => return Color::Black,
             Color::Black => return Color::White,

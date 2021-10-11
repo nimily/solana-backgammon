@@ -33,6 +33,9 @@ impl Processor {
             BackgammonInstruction::RequestDouble {} => {
                 Self::process_request_double(accounts, program_id)
             }
+            BackgammonInstruction::RespondToDouble { accept } => {
+                Self::process_respond_to_double(accounts, accept, program_id)
+            }
             _ => Ok(()),
         }
     }
@@ -103,6 +106,7 @@ impl Processor {
             return Err(BackgammonError::InvalidState.into());
         }
         game.state = GameState::Started;
+        game.multiplier = 1;
         game.white_pubkey = *white_info.key;
         game.black_pubkey = *black_info.key;
         game.game_id = game_id;
@@ -181,6 +185,46 @@ impl Processor {
         }
 
         game.state = GameState::Doubled;
+        Game::pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
+        Ok(())
+    }
+
+    fn process_respond_to_double(
+        accounts: &[AccountInfo],
+        accept: bool,
+        _program_id: &Pubkey,
+    ) -> ProgramResult {
+        let account_iter = &mut accounts.iter();
+        let player_info = next_account_info(account_iter)?;
+        let game_info = next_account_info(account_iter)?;
+        let clock_program_info = next_account_info(account_iter)?;
+        let clock = &Clock::from_account_info(&clock_program_info)?;
+
+        if player_info.is_signer == false {
+            return Err(BackgammonError::UnauthorizedAction.into());
+        }
+
+        msg!("Unpacking game account");
+        let mut game = Game::unpack_unchecked(&game_info.data.borrow())?;
+        if game.state != GameState::Doubled {
+            return Err(BackgammonError::InvalidState.into());
+        }
+
+        let player_color = game.get_color(player_info.key);
+        if player_color != Color::toggle(game.turn) {
+            return Err(BackgammonError::UnauthorizedAction.into());
+        }
+
+        if accept {
+            game.winner = game.turn;
+            game.state = GameState::Finished;
+        } else {
+            game.multiplier *= 2;
+            game.dice[0] = roll_die(clock);
+            game.dice[1] = roll_die(clock);
+            game.state = GameState::Rolled;
+            game.turn = Color::toggle(game.turn);
+        }
         Game::pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
         Ok(())
     }
