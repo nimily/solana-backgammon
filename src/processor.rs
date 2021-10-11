@@ -48,6 +48,10 @@ impl Processor {
 
         let rent = &Rent::from_account_info(rent_program_info)?;
 
+        if white_info.is_signer == false {
+            return Err(BackgammonError::UnauthorizedAction.into());
+        }
+
         // creating game account
         if game_info.data_len() == 0 {
             msg!("Creating a board account");
