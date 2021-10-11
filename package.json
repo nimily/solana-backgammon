@@ -1,0 +1,27 @@
+{
+  "name": "solana-backgammon",
+  "version": "1.0.0",
+  "description": "solana backgammon game",
+  "main": "index.js",
+  "scripts": {
+    "test": "node client/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nimily/solana-backgammon.git"
+  },
+  "keywords": [
+    "solana",
+    "backgammon"
+  ],
+  "author": "nimily, zlei",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/nimily/solana-backgammon/issues"
+  },
+  "homepage": "https://github.com/nimily/solana-backgammon#readme",
+  "dependencies": {
+    "@solana/web3.js": "^1.29.2",
+    "readline-sync": "^1.4.10"
+  }
+}
