@@ -1,5 +1,6 @@
 use crate::{
-    error::BackgammonError, instruction::BackgammonInstruction, state::Game, state::GameState,
+    error::BackgammonError, instruction::BackgammonInstruction, state::Color, state::Game,
+    state::GameState,
 };
 use borsh::BorshDeserialize;
 use solana_program::program_pack::IsInitialized;
@@ -116,15 +117,16 @@ impl Processor {
         let clock_program_info = next_account_info(account_iter)?;
         let clock = &Clock::from_account_info(&clock_program_info)?;
 
+        if player_info.is_signer == false {
+            return Err(BackgammonError::UnauthorizedAction.into());
+        }
+
         msg!("Unpacking game account");
         let mut game = Game::unpack_unchecked(&game_info.data.borrow())?;
         if game.state != GameState::Started && game.state != GameState::DoubleOrRoll {
             return Err(BackgammonError::InvalidState.into());
         }
 
-        if player_info.is_signer == false {
-            return Err(BackgammonError::UnauthorizedAction.into());
-        }
         let player_color = game.get_color(player_info.key);
         if game.state == GameState::Started {
             let player_index = player_color.index();
@@ -134,6 +136,14 @@ impl Processor {
             game.dice[player_index] = roll_die(clock);
             if game.dice[0] != 0 && game.dice[1] != 0 {
                 game.state = GameState::Rolled;
+                if game.dice[0] > game.dice[1] {
+                    game.turn = Color::White;
+                } else if game.dice[0] < game.dice[1] {
+                    game.turn = Color::Black;
+                } else {
+                    game.dice[0] = 0;
+                    game.dice[0] = 0;
+                }
             }
         } else {
             if player_color != game.turn {
@@ -142,6 +152,7 @@ impl Processor {
             game.dice[0] = roll_die(clock);
             game.dice[1] = roll_die(clock);
             game.state = GameState::Rolled;
+            game.turn = Color::toggle(game.turn);
         }
         Game::pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
         Ok(())

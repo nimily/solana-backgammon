@@ -82,6 +82,14 @@ impl Color {
             Color::Black => return 1,
         }
     }
+
+    pub fn toggle(&self) -> Color {
+        match self {
+            Color::None => return Color::None,
+            Color::White => return Color::Black,
+            Color::Black => return Color::White,
+        }
+    }
 }
 
 impl Default for Color {
