@@ -7,25 +7,33 @@ use solana_program::{
 
 use borsh::{BorshDeserialize, BorshSchema, BorshSerialize};
 
+#[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
+pub struct Game { // 132 bytes
+    pub state: GameState,
+    pub white_pubkey: Pubkey,
+    pub black_pubkey: Pubkey,
+    pub turn: Color,
+    pub winner: Color,
+    pub dice: [u8; 2],
+    pub multiplier: u8,
+    pub last_moves: [Move; 4],
+    pub board: Board,
+}
 
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
-pub struct Board { // 132 bytes
-    pub state: GameState,
+pub struct Board { // 54 bytes
     pub points: [Point; 24],
     pub completed: [Point; 2],
     pub out: Point,
 }
 
-#[derive(Clone, Debug, Copy, Default, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
-pub struct GameState {  // 78 bytes
-    pub is_initialized: bool,
-    pub white_pubkey: Pubkey,
-    pub black_pubkey: Pubkey,
-    pub turn: Color,
-    pub multiplier: u8,
-    pub has_doubled: bool,
-    pub dice: [u8; 2],
-    pub last_moves: [Move; 4],
+#[derive(Clone, Debug, Copy, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
+pub enum GameState { // 1 byte
+    Uninitialized,
+    Started,
+    DoubleOrRoll,
+    Rolled,
+    Doubled,
 }
 
 #[derive(Clone, Debug, Copy, Default, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
@@ -52,18 +60,18 @@ impl Default for Color {
 }
 
 
-impl IsInitialized for Board {
+impl IsInitialized for Game {
     fn is_initialized(&self) -> bool {
-        self.state.is_initialized
+        self.state != GameState::Uninitialized
     }
 }
 
-impl Sealed for Board {}
+impl Sealed for Game {}
 
-impl Pack for Board {
+impl Pack for Game {
     const LEN: usize = 0; // FIXME
     fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
-        let result = try_from_slice_unchecked::<Board>(src)?;
+        let result = try_from_slice_unchecked::<Game>(src)?;
         Ok(result)
     }
 

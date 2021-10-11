@@ -1,5 +1,5 @@
 use crate::{
-    error::BackgammonError, instruction::BackgammonInstruction, state::Board, state::GameState,
+    error::BackgammonError, instruction::BackgammonInstruction, state::Game, state::GameState,
 };
 use borsh::BorshDeserialize;
 use solana_program::{
@@ -24,14 +24,16 @@ impl Processor {
         let instruction = BackgammonInstruction::try_from_slice(&instruction_data)?;
 
         match instruction {
-            BackgammonInstruction::InitGame {  } => {
-                Self::process_init_game(accounts, program_id)
+            BackgammonInstruction::InitGame { game_id } => {
+                Self::process_init_game(accounts, game_id, program_id)
             }
+            _ => {Ok(())}
         }
     }
 
     fn process_init_game(
         accounts: &[AccountInfo],
+        game_id: u64,
         program_id: &Pubkey,
     ) -> ProgramResult {
         Ok(())

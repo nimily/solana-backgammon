@@ -2,22 +2,52 @@ use borsh::{BorshDeserialize, BorshSchema, BorshSerialize};
 
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
 pub enum BackgammonInstruction {
-    /// Starts the trade by creating and populating an escrow account and transferring ownership of the given temp token account to the PDA
+    /// Initializes the game object
     ///
     ///
     /// Accounts expected:
     ///
-    /// 0. `[signer]` alice
-    /// 1. `[]` bob
-    /// 2. `[]` mint_x
-    /// 3. `[]` mint_y
-    /// 4. `[writable]` escrow
-    /// 5. `[writable]` escrow's mint_x vault
-    /// 6. `[writable]` escrow's minit_y vault
-    /// 7. `[]` auth
-    /// 8. `[]` system_program
-    /// 9. `[]` sysvar_rent_program
-    /// 10. `[]` token_program
-    InitGame {
-    },
+    /// 0. `[signer]` white
+    /// 1. `[]` black
+    /// 2. `[writable]` board
+    /// 3. `[]` system_program
+    /// 4. `[]` sysvar_rent_program
+    InitGame { game_id: u64 },
+
+    ///
+    ///
+    ///
+    /// Accounts expected:
+    ///
+    /// 0. `[signer]` player
+    /// 1. `[writable]` board
+    /// 2. `[]` sysvar_clock_program
+    Roll {},
+
+    ///
+    ///
+    ///
+    /// Accounts expected:
+    ///
+    /// 0. `[signer]` player
+    /// 1. `[writable]` board
+    RequestDouble {},
+
+    ///
+    ///
+    ///
+    /// Accounts expected:
+    ///
+    /// 0. `[signer]` player
+    /// 1. `[writable]` board
+    RespondDouble { accept: bool },
+
+    ///
+    ///
+    ///
+    /// Accounts expected:
+    ///
+    /// 0. `[signer]` player
+    /// 1. `[writable]` board
+    ApplyMoves { moves: [[u8; 2]; 4] },
 }
