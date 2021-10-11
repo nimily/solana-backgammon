@@ -1,6 +1,6 @@
 use crate::{
     error::BackgammonError, instruction::BackgammonInstruction, state::Color, state::Game,
-    state::GameState,
+    state::GameState, state::Move,
 };
 use borsh::BorshDeserialize;
 use solana_program::program_pack::IsInitialized;
@@ -36,7 +36,9 @@ impl Processor {
             BackgammonInstruction::RespondToDouble { accept } => {
                 Self::process_respond_to_double(accounts, accept, program_id)
             }
-            _ => Ok(()),
+            BackgammonInstruction::ApplyMoves { moves } => {
+                Self::process_apply_moves(accounts, moves, program_id)
+            }
         }
     }
 
@@ -225,6 +227,85 @@ impl Processor {
             game.state = GameState::Rolled;
             game.turn = Color::toggle(game.turn);
         }
+        Game::pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
+        Ok(())
+    }
+
+    fn process_apply_moves(
+        accounts: &[AccountInfo],
+        moves: [Move; 4],
+        _program_id: &Pubkey,
+    ) -> ProgramResult {
+        let account_iter = &mut accounts.iter();
+        let player_info = next_account_info(account_iter)?;
+        let game_info = next_account_info(account_iter)?;
+        let clock_program_info = next_account_info(account_iter)?;
+        let clock = &Clock::from_account_info(&clock_program_info)?;
+
+        if player_info.is_signer == false {
+            return Err(BackgammonError::UnauthorizedAction.into());
+        }
+
+        msg!("Unpacking game account");
+        let mut game = Game::unpack_unchecked(&game_info.data.borrow())?;
+        if game.state != GameState::Doubled {
+            return Err(BackgammonError::InvalidState.into());
+        }
+
+        let player_color = game.get_color(player_info.key);
+        if player_color != Color::toggle(game.turn) {
+            return Err(BackgammonError::UnauthorizedAction.into());
+        }
+
+        let mut values = vec![game.dice[0], game.dice[1]];
+        if game.dice[0] == game.dice[1] {
+            values.push(game.dice[0]);
+            values.push(game.dice[0]);
+        }
+        let direction = Color::sign(player_color);
+        for i in 0..4 {
+            if values.contains(&moves[i].steps) == false {
+                return Err(BackgammonError::InvalidMove.into());
+            }
+
+            let steps = moves[i].steps as i32;
+            let src = moves[i].start as i32;
+            let dst = src + direction * steps;
+            
+            let mut points = &mut game.board.points;
+            
+            if points[src as usize].color != game.turn {
+                return Err(BackgammonError::InvalidMove.into());
+            }
+
+            if (1 <= dst) && (dst <= 24) {
+                if points[dst as usize].color == Color::toggle(player_color) {
+                    if points[dst as usize].n_pieces > 1 {
+                        return Err(BackgammonError::InvalidMove.into());
+                    }
+                    let middle = Color::middle_point_index(points[dst as usize].color);
+                    points[middle].color = points[dst as usize].color;
+                    points[middle].n_pieces += 1;
+                    points[dst as usize].n_pieces = 0;
+                }
+                points[dst as usize].n_pieces += 1;
+                points[dst as usize].color = player_color;
+            } else {
+                game.board.completed[Color::index(&game.turn)] += 1;
+            }
+            points[src as usize].n_pieces -= 1;
+            if points[src as usize].n_pieces == 0 {
+                points[src as usize].color = Color::None;
+            }
+
+            let index = values.iter().position(|x| *x == moves[i].steps).unwrap();
+            values.remove(index);
+        }
+        game.last_moves = moves;
+        game.dice[0] = 0;
+        game.dice[1] = 0;
+        game.turn = Color::toggle(game.turn);
+        game.state = GameState::DoubleOrRoll;
         Game::pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
         Ok(())
     }

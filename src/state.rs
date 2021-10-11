@@ -37,9 +37,8 @@ impl Game {
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
 pub struct Board {
     // 54 bytes
-    pub points: [Point; 24],
-    pub completed: [Point; 2],
-    pub out: Point,
+    pub points: [Point; 26],
+    pub completed: [u8; 2],
 }
 
 #[derive(Clone, Debug, Copy, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
@@ -89,6 +88,22 @@ impl Color {
             Color::None => return Color::None,
             Color::White => return Color::Black,
             Color::Black => return Color::White,
+        }
+    }
+
+    pub fn sign(color: Color) -> i32 {
+        match color {
+            Color::None => return 0,
+            Color::White => return 1,
+            Color::Black => return -1,
+        }
+    }
+
+    pub fn middle_point_index(color: Color) -> usize {
+        match color {
+            Color::None => return 13,
+            Color::White => return 0,
+            Color::Black => return 25,
         }
     }
 }

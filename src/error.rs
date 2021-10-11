@@ -12,6 +12,9 @@ pub enum BackgammonError {
 
     #[error("Unauthorized Action")]
     UnauthorizedAction,
+
+    #[error("Invalid Move")]
+    InvalidMove,
 }
 
 impl From<BackgammonError> for ProgramError {
