@@ -9,7 +9,7 @@ pub enum BackgammonInstruction {
     ///
     /// 0. `[signer]` white
     /// 1. `[]` black
-    /// 2. `[writable]` board
+    /// 2. `[writable]` game
     /// 3. `[]` system_program
     /// 4. `[]` sysvar_rent_program
     InitGame { game_id: u64 },
@@ -20,7 +20,7 @@ pub enum BackgammonInstruction {
     /// Accounts expected:
     ///
     /// 0. `[signer]` player
-    /// 1. `[writable]` board
+    /// 1. `[writable]` game
     /// 2. `[]` sysvar_clock_program
     Roll {},
 
@@ -30,7 +30,7 @@ pub enum BackgammonInstruction {
     /// Accounts expected:
     ///
     /// 0. `[signer]` player
-    /// 1. `[writable]` board
+    /// 1. `[writable]` game
     RequestDouble {},
 
     ///
@@ -39,7 +39,7 @@ pub enum BackgammonInstruction {
     /// Accounts expected:
     ///
     /// 0. `[signer]` player
-    /// 1. `[writable]` board
+    /// 1. `[writable]` game
     RespondDouble { accept: bool },
 
     ///
@@ -48,6 +48,6 @@ pub enum BackgammonInstruction {
     /// Accounts expected:
     ///
     /// 0. `[signer]` player
-    /// 1. `[writable]` board
+    /// 1. `[writable]` game
     ApplyMoves { moves: [[u8; 2]; 4] },
 }

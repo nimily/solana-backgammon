@@ -6,6 +6,12 @@ use solana_program::program_error::ProgramError;
 pub enum BackgammonError {
     #[error("Invalid Instruction")]
     InvalidInstruction,
+
+    #[error("Invalid State")]
+    InvalidState,
+
+    #[error("Unauthorized Action")]
+    UnauthorizedAction,
 }
 
 impl From<BackgammonError> for ProgramError {
