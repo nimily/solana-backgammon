@@ -22,6 +22,7 @@
   "homepage": "https://github.com/nimily/solana-backgammon#readme",
   "dependencies": {
     "@solana/web3.js": "^1.29.2",
+    "buffer": "^6.0.3",
     "readline-sync": "^1.4.10"
   }
 }
