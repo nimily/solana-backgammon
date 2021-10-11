@@ -30,7 +30,9 @@ impl Processor {
                 Self::process_init_game(accounts, game_id, program_id)
             }
             BackgammonInstruction::Roll {} => Self::process_roll(accounts, program_id),
-
+            BackgammonInstruction::RequestDouble {} => {
+                Self::process_request_double(accounts, program_id)
+            }
             _ => Ok(()),
         }
     }
@@ -154,6 +156,31 @@ impl Processor {
             game.state = GameState::Rolled;
             game.turn = Color::toggle(game.turn);
         }
+        Game::pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
+        Ok(())
+    }
+
+    fn process_request_double(accounts: &[AccountInfo], _program_id: &Pubkey) -> ProgramResult {
+        let account_iter = &mut accounts.iter();
+        let player_info = next_account_info(account_iter)?;
+        let game_info = next_account_info(account_iter)?;
+
+        if player_info.is_signer == false {
+            return Err(BackgammonError::UnauthorizedAction.into());
+        }
+
+        msg!("Unpacking game account");
+        let mut game = Game::unpack_unchecked(&game_info.data.borrow())?;
+        if game.state != GameState::DoubleOrRoll {
+            return Err(BackgammonError::InvalidState.into());
+        }
+
+        let player_color = game.get_color(player_info.key);
+        if player_color != game.turn {
+            return Err(BackgammonError::UnauthorizedAction.into());
+        }
+
+        game.state = GameState::Doubled;
         Game::pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
         Ok(())
     }
