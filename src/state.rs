@@ -106,6 +106,14 @@ impl Color {
             Color::Black => return 25,
         }
     }
+
+    pub fn to_string(&self) -> &str {
+        match self {
+            Color::None => return "None",
+            Color::White => return "White",
+            Color::Black => return "Black",
+        }
+    }
 }
 
 impl Default for Color {

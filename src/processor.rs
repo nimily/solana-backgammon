@@ -265,12 +265,13 @@ impl Processor {
         msg!("Unpacking game account");
         let mut game = Game::unpack_unchecked(&game_info.data.borrow())?;
         if game.state != GameState::Rolled {
-            msg!("The dice are not rolled yet.");
+            msg!("The dice are not rolled yet");
             return Err(BackgammonError::InvalidState.into());
         }
 
         let player_color = game.get_color(player_info.key);
-        if player_color != Color::toggle(game.turn) {
+        if player_color != game.turn {
+            msg!("It's not {}'s turn", player_color.to_string());
             return Err(BackgammonError::UnauthorizedAction.into());
         }
 
@@ -282,6 +283,7 @@ impl Processor {
         let direction = Color::sign(player_color);
         for i in 0..4 {
             if values.contains(&moves[i].steps) == false {
+                msg!("You can not move a checker for {} steps", moves[i].steps);
                 return Err(BackgammonError::InvalidMove.into());
             }
 
@@ -292,12 +294,14 @@ impl Processor {
             let mut points = &mut game.board.points;
 
             if points[src as usize].color != game.turn {
+                msg!("You can not move an opponent's checker");
                 return Err(BackgammonError::InvalidMove.into());
             }
 
             if (1 <= dst) && (dst <= 24) {
                 if points[dst as usize].color == Color::toggle(player_color) {
                     if points[dst as usize].n_pieces > 1 {
+                        msg!("The target point cannot have more than one opponent's checker");
                         return Err(BackgammonError::InvalidMove.into());
                     }
                     let middle = Color::middle_point_index(points[dst as usize].color);
