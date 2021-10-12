@@ -319,7 +319,10 @@ function checkMove(player, steps) {
                 ],
                 data: buffer.Buffer.from([4, ...actions])
             });
-            await solana.sendAndConfirmTransaction(connection1, new solana.Transaction().add(move),[player1]);
+            let move_instruction = await connection1.sendTransaction(new solana.Transaction().add(move),[player1]);
+            console.log(move_instruction);
+            connection1.confirmTransaction(move_instruction);
+            // await solana.sendAndConfirmTransaction(connection1, new solana.Transaction().add(move),[player1]);
             console.log("saving moves");
         } else {
             let move = new solana.TransactionInstruction({
@@ -331,7 +334,10 @@ function checkMove(player, steps) {
                 data: buffer.Buffer.from([4, ...actions])
                 
             });
-            await solana.sendAndConfirmTransaction(connection2, new solana.Transaction().add(move),[player2]);
+            let move_instruction = await connection2.sendTransaction(new solana.Transaction().add(move),[player2]);
+            console.log(move_instruction);
+            connection2.confirmTransaction(move_instruction);
+            // await solana.sendAndConfirmTransaction(connection2, new solana.Transaction().add(move),[player2]);
             console.log("saving moves");
         }
         turn = -turn;
