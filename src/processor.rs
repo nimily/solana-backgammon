@@ -220,6 +220,7 @@ impl Processor {
         msg!("Unpacking game account");
         let mut game = Game::unpack_unchecked(&game_info.data.borrow())?;
         if game.state != GameState::Doubled {
+            msg!("The opponent has not responded to the double yet.");
             return Err(BackgammonError::InvalidState.into());
         }
 
@@ -233,6 +234,7 @@ impl Processor {
             game.state = GameState::Finished;
         } else {
             game.multiplier *= 2;
+            game.last_doubled = game.turn;
             game.dice[0] = roll_die(clock, 0);
             game.dice[1] = roll_die(clock, 1);
             game.state = GameState::Rolled;
@@ -253,18 +255,24 @@ impl Processor {
         let clock_program_info = next_account_info(account_iter)?;
         let clock = &Clock::from_account_info(&clock_program_info)?;
 
+        for i in 0..4 {
+            msg!("move {} for {} steps", moves[i].start, moves[i].steps);
+        }
+
         if player_info.is_signer == false {
             return Err(BackgammonError::UnauthorizedAction.into());
         }
 
         msg!("Unpacking game account");
         let mut game = Game::unpack_unchecked(&game_info.data.borrow())?;
-        if game.state != GameState::Doubled {
+        if game.state != GameState::Rolled {
+            msg!("The dice are not rolled yet");
             return Err(BackgammonError::InvalidState.into());
         }
 
         let player_color = game.get_color(player_info.key);
-        if player_color != Color::toggle(game.turn) {
+        if player_color != game.turn {
+            msg!("It's not {}'s turn", player_color.to_string());
             return Err(BackgammonError::UnauthorizedAction.into());
         }
 
@@ -275,7 +283,13 @@ impl Processor {
         }
         let direction = Color::sign(player_color);
         for i in 0..4 {
+            if moves[i].steps == 0 {
+                // TODO check if this is desired.
+                msg!("Only {} moves were available", i);
+                break;
+            }
             if values.contains(&moves[i].steps) == false {
+                msg!("You can not move a checker for {} steps", moves[i].steps);
                 return Err(BackgammonError::InvalidMove.into());
             }
 
@@ -286,12 +300,14 @@ impl Processor {
             let mut points = &mut game.board.points;
 
             if points[src as usize].color != game.turn {
+                msg!("You can not move an opponent's checker");
                 return Err(BackgammonError::InvalidMove.into());
             }
 
             if (1 <= dst) && (dst <= 24) {
                 if points[dst as usize].color == Color::toggle(player_color) {
                     if points[dst as usize].n_pieces > 1 {
+                        msg!("The target point cannot have more than one opponent's checker");
                         return Err(BackgammonError::InvalidMove.into());
                     }
                     let middle = Color::middle_point_index(points[dst as usize].color);
@@ -312,11 +328,19 @@ impl Processor {
             let index = values.iter().position(|x| *x == moves[i].steps).unwrap();
             values.remove(index);
         }
+        msg!("Moves applied, updating the state...");
         game.last_moves = moves;
-        game.dice[0] = 0;
-        game.dice[1] = 0;
         game.turn = Color::toggle(game.turn);
-        game.state = GameState::DoubleOrRoll;
+        if game.last_doubled == game.turn || game.multiplier == 64 {
+            game.dice[0] = roll_die(clock, 0);
+            game.dice[1] = roll_die(clock, 1);
+            game.state = GameState::Rolled;
+        } else {
+            game.dice[0] = 0;
+            game.dice[1] = 0;
+            game.state = GameState::DoubleOrRoll;
+        }
+        msg!("Saving the game...");
         Game::pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
         Ok(())
     }
@@ -324,5 +348,5 @@ impl Processor {
 
 fn roll_die(clock: &Clock, seed: u8) -> u8 {
     let divisor = 6_i64.pow(seed as u32);
-    ((clock.unix_timestamp / divisor) % 6) as u8
+    ((clock.unix_timestamp / divisor) % 6) as u8 + 1
 }
