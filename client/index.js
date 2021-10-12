@@ -213,6 +213,9 @@ function checkMove(player, steps) {
                     } else {
                         board[step-1] -= 1;
                     }
+                    actions[action_cnt*2] = 0;
+                    actions[action_cnt*2+1] = step;
+                    action_cnt += 1;
                 } else {
                     const start = parseInt(readline.question("Which checker do player -1 want to move: "));
                     if (board[start-1] >= 0) {
@@ -239,6 +242,9 @@ function checkMove(player, steps) {
                     } else {
                         board[start-1+step] -= 1;
                     }
+                    actions[action_cnt*2] = start;
+                    actions[action_cnt*2+1] = step;
+                    action_cnt += 1;
                 }
             } else {
                 if (midBoard[1] > 0) {
@@ -260,6 +266,9 @@ function checkMove(player, steps) {
                     } else {
                         board[24-step] += 1;
                     }
+                    actions[action_cnt*2] = 25;
+                    actions[action_cnt*2+1] = step;
+                    action_cnt += 1;
                 } else {
                     const start = parseInt(readline.question("Which checker do player +1 want to move: "));
                     if (board[start-1] <= 0) {
@@ -286,9 +295,37 @@ function checkMove(player, steps) {
                     } else {
                         board[start-1-step] += 1;
                     }
+                    actions[action_cnt*2] = start;
+                    actions[action_cnt*2+1] = step;
+                    action_cnt += 1;
                 }
             }
             display();
+        }
+        if (turn === -1) {
+            let move = new solana.TransactionInstruction({
+                programId: program_id,
+                keys: [
+                    {pubkey: player1.publicKey, isSigner: false, isWritable: false},
+                    {pubkey: game, isSigner: false, isWritable: true}
+                ],
+                data: buffer.Buffer.from([4, ...actions])
+            });
+            console.log([4, ...actions]);
+            await solana.sendAndConfirmTransaction(connection1, new solana.Transaction().add(move),[player1]);
+            console.log("saving moves");
+        } else {
+            let move = new solana.TransactionInstruction({
+                programId: program_id,
+                keys: [
+                    {pubkey: player2.publicKey, isSigner: false, isWritable: false},
+                    {pubkey: game, isSigner: false, isWritable: true}
+                ],
+                data: buffer.Buffer.from([4, ...actions])
+                
+            });
+            await solana.sendAndConfirmTransaction(connection2, new solana.Transaction().add(move),[player2]);
+            console.log("saving moves");
         }
         turn = -turn;
     }
