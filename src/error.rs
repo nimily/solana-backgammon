@@ -15,6 +15,12 @@ pub enum BackgammonError {
 
     #[error("Invalid Move")]
     InvalidMove,
+
+    #[error("Invalid Color")]
+    InvalidColor,
+
+    #[error("Invalid Point")]
+    InvalidPoint,
 }
 
 impl From<BackgammonError> for ProgramError {

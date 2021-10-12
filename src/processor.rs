@@ -140,12 +140,13 @@ impl Processor {
         msg!("Unpacking game account");
         let mut game = Game::unpack_unchecked(&game_info.data.borrow())?;
         if game.state != GameState::Started && game.state != GameState::DoubleOrRoll {
+            msg!("Rolling is only possible when Started or DoubleOrRoll (state = {})", game.state);
             return Err(BackgammonError::InvalidState.into());
         }
 
         let player_color = game.get_color(player_info.key);
         if game.state == GameState::Started {
-            let player_index = player_color.index();
+            let player_index = player_color.index()?;
             if game.dice[player_index] != 0 {
                 return Err(BackgammonError::InvalidState.into());
             }
@@ -168,7 +169,7 @@ impl Processor {
             game.dice[0] = roll_die(program_id, &game, 0);
             game.dice[1] = roll_die(program_id, &game, 1);
             game.state = GameState::Rolled;
-            game.turn = Color::toggle(game.turn);
+            game.calc_max_moves();
         }
         Game::incr_and_pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
         Ok(())
@@ -220,7 +221,7 @@ impl Processor {
         }
 
         let player_color = game.get_color(player_info.key);
-        if player_color != Color::toggle(game.turn) {
+        if player_color != game.turn.opponent()? {
             return Err(BackgammonError::UnauthorizedAction.into());
         }
 
@@ -287,44 +288,14 @@ impl Processor {
                 return Err(BackgammonError::InvalidMove.into());
             }
 
-            let steps = moves[i].steps as i32;
-            let src = moves[i].start as i32;
-            let dst = src + direction * steps;
-
-            let mut points = &mut game.board.points;
-
-            if points[src as usize].color != game.turn {
-                msg!("You can not move an opponent's checker");
-                return Err(BackgammonError::InvalidMove.into());
-            }
-
-            if (1 <= dst) && (dst <= 24) {
-                if points[dst as usize].color == Color::toggle(player_color) {
-                    if points[dst as usize].n_pieces > 1 {
-                        msg!("The target point cannot have more than one opponent's checker");
-                        return Err(BackgammonError::InvalidMove.into());
-                    }
-                    let middle = Color::middle_point_index(points[dst as usize].color);
-                    points[middle].color = points[dst as usize].color;
-                    points[middle].n_pieces += 1;
-                    points[dst as usize].n_pieces = 0;
-                }
-                points[dst as usize].n_pieces += 1;
-                points[dst as usize].color = player_color;
-            } else {
-                game.board.completed[Color::index(&game.turn)] += 1;
-            }
-            points[src as usize].n_pieces -= 1;
-            if points[src as usize].n_pieces == 0 {
-                points[src as usize].color = Color::None;
-            }
+            game.board.apply_move(game.turn, moves[i])?;
 
             let index = values.iter().position(|x| *x == moves[i].steps).unwrap();
             values.remove(index);
         }
         msg!("Moves applied, updating the state...");
         game.last_moves = moves;
-        game.turn = Color::toggle(game.turn);
+        game.turn = game.turn.opponent()?;
         if game.last_doubled == game.turn || game.multiplier == 64 {
             msg!("case 1");
             game.dice[0] = roll_die(program_id, &game, 0);
@@ -337,6 +308,7 @@ impl Processor {
             game.dice[1] = 0;
             game.state = GameState::DoubleOrRoll;
         }
+        // return Err(BackgammonError::InvalidMove.into());
         msg!("Saving the game...");
         Game::incr_and_pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
         Ok(())
