@@ -46,6 +46,12 @@ function getKeypair(player) {
     }
 }
 
+// function retry(action) {
+//     try {
+//         await action;
+//     } except
+// }
+
 function display() {
     console.log("=".repeat(100));
     console.log("=".repeat(100));
@@ -315,29 +321,25 @@ function checkMove(player, steps) {
                 programId: program_id,
                 keys: [
                     {pubkey: player1.publicKey, isSigner: false, isWritable: false},
-                    {pubkey: game, isSigner: false, isWritable: true}
+                    {pubkey: game, isSigner: false, isWritable: true},
+                    {pubkey: clock, isSigner: false, isWritable: false}
                 ],
                 data: buffer.Buffer.from([4, ...actions])
             });
-            let move_instruction = await connection1.sendTransaction(new solana.Transaction().add(move),[player1]);
-            console.log(move_instruction);
-            connection1.confirmTransaction(move_instruction);
-            // await solana.sendAndConfirmTransaction(connection1, new solana.Transaction().add(move),[player1]);
+            await solana.sendAndConfirmTransaction(connection1, new solana.Transaction().add(move),[player1]);
             console.log("saving moves");
         } else {
             let move = new solana.TransactionInstruction({
                 programId: program_id,
                 keys: [
                     {pubkey: player2.publicKey, isSigner: false, isWritable: false},
-                    {pubkey: game, isSigner: false, isWritable: true}
+                    {pubkey: game, isSigner: false, isWritable: true},
+                    {pubkey: clock, isSigner: false, isWritable: false}
                 ],
                 data: buffer.Buffer.from([4, ...actions])
                 
             });
-            let move_instruction = await connection2.sendTransaction(new solana.Transaction().add(move),[player2]);
-            console.log(move_instruction);
-            connection2.confirmTransaction(move_instruction);
-            // await solana.sendAndConfirmTransaction(connection2, new solana.Transaction().add(move),[player2]);
+            await solana.sendAndConfirmTransaction(connection2, new solana.Transaction().add(move),[player2]);
             console.log("saving moves");
         }
         turn = -turn;
