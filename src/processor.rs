@@ -115,12 +115,13 @@ impl Processor {
 
         let points = &mut game.board.points;
         let n_pieces: [u8; 4] = [2, 5, 3, 5];
-        for i in [1, 12, 17, 19] {
-            points[i].color = Color::White;
-            points[i].n_pieces = n_pieces[i];
+        let indexes: [usize; 4] = [1, 12, 17, 19];
+        for i in 0..4 {
+            points[indexes[i]].color = Color::White;
+            points[indexes[i]].n_pieces = n_pieces[i];
 
-            points[25 - i].color = Color::Black;
-            points[25 - i].n_pieces = n_pieces[i];
+            points[25 - indexes[i]].color = Color::Black;
+            points[25 - indexes[i]].n_pieces = n_pieces[i];
         }
         msg!("Serializing game");
         Game::pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
