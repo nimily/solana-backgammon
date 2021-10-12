@@ -2,27 +2,36 @@ const readline = require('readline-sync');
 const rpcUrl = "https://api.devnet.solana.com";
 const solana = require('@solana/web3.js');
 const buffer = require('buffer');
+const crypto = require("crypto");
+
 const connection1 = new solana.Connection(rpcUrl, 'confirmed');
 const connection2 = new solana.Connection(rpcUrl, 'confirmed');
 
 let board = [-2, 0, 0, 0, 0, 5, 0, 3, 0, 0, 0, -5, 5, 0, 0, 0, -3, 0, -5, 0, 0, 0, 0, 2];
 let midBoard = [0, 0];
 let rightBoard = [0, 0];
+let dice = [0, 0];
+
+const game_id = crypto.randomBytes(8);
+console.log("game id", game_id);
 
 const program_id = new solana.PublicKey("Aqqg8L83rjkNfhLzAeZ4Aq37TBZyXnvLPWRTMruTWmJ8");
 
-let player1 = readline.question("Secret key string of player 1: ");
-let player2 = readline.question("Secret key string of player 2: ");
+// let player1 = readline.question("Secret key string of player 1: ");
+// let player2 = readline.question("Secret key string of player 2: ");
 
-player1 = getKeypair(player1);
-player2 = getKeypair(player2);
-game = getKeypair("");
+// player1 = getKeypair(player1);
+// player2 = getKeypair(player2);
+
+player1 = solana.Keypair.fromSeed(new Uint8Array(32).fill(1));
+player2 = solana.Keypair.fromSeed(new Uint8Array(32).fill(2));
+
+
 console.log("player1", player1.publicKey.toBase58());
 console.log("player2", player2.publicKey.toBase58());
-console.log("game", game.publicKey.toBase58());
 
-const system_program = solana.PublicKey.default;
-console.log("system program id", system_program.toBase58());
+const system = solana.PublicKey.default;
+console.log("system program id", system.toBase58());
 const rent = solana.SYSVAR_RENT_PUBKEY;
 console.log("rent program id", rent.toBase58());
 const clock = solana.SYSVAR_CLOCK_PUBKEY;
@@ -59,29 +68,28 @@ function display() {
 
 (async () => {
     
-
-
-    const airdropSignature1 = await connection1.requestAirdrop(player1.publicKey, 1000000000);
-    await connection1.confirmTransaction(airdropSignature1);
+    const [game, game_seed] = await solana.PublicKey.findProgramAddress([player1.publicKey.toBytes(), player2.publicKey.toBytes(), game_id], program_id);
+    console.log("game", game.toBase58());
+    // const airdropSignature1 = await connection1.requestAirdrop(player1.publicKey, 1000000000);
+    // await connection1.confirmTransaction(airdropSignature1);
     
 
-    await new Promise(resolve => setTimeout(resolve, 60000));
+    // await new Promise(resolve => setTimeout(resolve, 60000));
 
-    const airdropSignature2 = await connection2.requestAirdrop(player2.publicKey, 1000000000);
-    await connection2.confirmTransaction(airdropSignature2);
+    // const airdropSignature2 = await connection2.requestAirdrop(player2.publicKey, 1000000000);
+    // await connection2.confirmTransaction(airdropSignature2);
 
     const initialize = new solana.TransactionInstruction({
         programId: program_id,
         keys: [
             {pubkey: player1.publicKey, isSigner: false, isWritable: false},
             {pubkey: player2.publicKey, isSigner: false, isWritable: false},
-            {pubkey: game.publicKey, isSigner: false, isWritable: true},
-            {pubkey: system_program, isSigner: false, isWritable: false},
+            {pubkey: game, isSigner: false, isWritable: true},
+            {pubkey: system, isSigner: false, isWritable: false},
             {pubkey: rent, isSigner: false, isWritable: false}
         ],
-        data: buffer.Buffer.from([0, 1, 0, 0, 0, 0, 0, 0, 0])
+        data: buffer.Buffer.from([0, ...game_id])
     });
-    console.log(await connection1.getAccountInfo(player1.publicKey));
     await solana.sendAndConfirmTransaction(connection1, new solana.Transaction().add(initialize),[player1]);
     console.log("initialized");
 
@@ -93,11 +101,17 @@ function display() {
                 programId: program_id,
                 keys: [
                     {pubkey: player1.publicKey, isSigner: false, isWritable: false},
-                    {pubkey: game.publicKey, isSigner: false, isWritable: true},
-                    {pubkey: system_program, isSigner: false, isWritable: false},
+                    {pubkey: game, isSigner: false, isWritable: true},
                     {pubkey: clock, isSigner: false, isWritable: false}
                 ],
-            })
+                data: buffer.Buffer.from([1])
+                
+            });
+            await solana.sendAndConfirmTransaction(connection1, new solana.Transaction().add(roll),[player1]);
+            console.log("rolliing dices");
+            game_info = await connection1.getAccountInfo(game);
+            console.log(game_info.data[75]);
+            console.log(game_info.data[76]);
         }
         display();
         break;

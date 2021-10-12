@@ -23,6 +23,7 @@
   "dependencies": {
     "@solana/web3.js": "^1.29.2",
     "buffer": "^6.0.3",
+    "crypto": "^1.0.1",
     "readline-sync": "^1.4.10"
   }
 }
