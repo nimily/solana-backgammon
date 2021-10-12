@@ -1,5 +1,4 @@
 // use std::fmt::Result;
-use std::fmt;
 use solana_program::{
     borsh::try_from_slice_unchecked,
     msg,
@@ -7,6 +6,7 @@ use solana_program::{
     program_pack::{IsInitialized, Pack, Sealed},
     pubkey::Pubkey,
 };
+use std::fmt;
 
 use borsh::{BorshDeserialize, BorshSchema, BorshSerialize};
 
@@ -76,7 +76,7 @@ impl Board {
         Ok(self.points[bar_index].n_pieces > 0)
     }
 
-    pub fn is_valid_move(&self, color: Color, move_: Move) -> Result<bool, ProgramError> {
+    pub fn is_valid_move(&self, color: Color, move_: Move) -> Result<(), ProgramError> {
         if self.points[move_.start as usize].color != color {
             msg!("{} cannot move the opponent's checkers", color.to_string());
             return Err(BackgammonError::InvalidMove.into());
@@ -88,7 +88,10 @@ impl Board {
 
             if farthest > 6 {
                 // not all pieces are in home
-                msg!("{} can not bear off as has pieces in the outer board", color.to_string());
+                msg!(
+                    "{} can not bear off as has pieces in the outer board",
+                    color.to_string()
+                );
                 return Err(BackgammonError::InvalidMove.into());
             }
 
@@ -103,7 +106,7 @@ impl Board {
                 return Err(BackgammonError::InvalidMove.into());
             }
         }
-        Ok(true)
+        Ok(())
     }
 
     pub fn apply_move(&mut self, color: Color, move_: Move) -> Result<bool, ProgramError> {

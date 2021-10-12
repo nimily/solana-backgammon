@@ -140,7 +140,10 @@ impl Processor {
         msg!("Unpacking game account");
         let mut game = Game::unpack_unchecked(&game_info.data.borrow())?;
         if game.state != GameState::Started && game.state != GameState::DoubleOrRoll {
-            msg!("Rolling is only possible when Started or DoubleOrRoll (state = {})", game.state);
+            msg!(
+                "Rolling is only possible when Started or DoubleOrRoll (state = {})",
+                game.state
+            );
             return Err(BackgammonError::InvalidState.into());
         }
 
@@ -277,7 +280,11 @@ impl Processor {
             values.push(game.dice[0]);
         }
         for i in 0..4 {
-            msg!("applying move {} for {} steps", moves[i].start, moves[i].steps);
+            msg!(
+                "applying move {} for {} steps",
+                moves[i].start,
+                moves[i].steps
+            );
             if moves[i].steps == 0 {
                 // TODO check if this is desired.
                 msg!("Only {} moves were available", i);

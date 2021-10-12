@@ -1,5 +1,5 @@
-use borsh::{BorshDeserialize, BorshSchema, BorshSerialize};
 use crate::state::Move;
+use borsh::{BorshDeserialize, BorshSchema, BorshSerialize};
 
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
 pub enum BackgammonInstruction {
