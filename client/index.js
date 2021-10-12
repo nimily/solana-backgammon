@@ -279,10 +279,14 @@ async function checkBoard(data) {
         turn = game_info.data[73] * 2 - 3;
         console.log(`player ${turn} is first`);
     }
+
     while ((rightBoard[0] < 15) && (rightBoard[1] < 15)) {
 
         display();
-        if (turn === -1) {
+        let game_info = await getInfo(game, turn);
+        doubleRoll = (game_info.data[8] === 2);
+        if ((turn === -1) && doubleRoll) {
+            let game_info = await getInfo(game, -1);
             const request = readline.question(`Do player -1 want to double (Y/N, default N): `);
             if (request[0] == "Y" || request[0] == "y") {
                 const double = new solana.TransactionInstruction({
@@ -322,7 +326,7 @@ async function checkBoard(data) {
                     console.log("player 1 refuses");
                 }
             }
-        } else {
+        } else if ((turn === -1) && doubleRoll) {
             const request = readline.question(`Do player 1 want to double (Y/N, default N): `);
             if (request[0] == "Y" || request[0] == "y") {
                 const double = new solana.TransactionInstruction({
@@ -362,7 +366,7 @@ async function checkBoard(data) {
                     console.log("player -1 refuses");
                 }
             }
-        }
+        } 
         
         let avail;
         if (dice[0] === dice[1]) {
@@ -531,7 +535,7 @@ async function checkBoard(data) {
         }
 
         turn = -turn;
-        let game_info = await getInfo(game, turn);
+        game_info = await getInfo(game, turn);
         turn = game_info.data[73] * 2 - 3;
         if (turn === -1) {
             let roll = new solana.TransactionInstruction({
