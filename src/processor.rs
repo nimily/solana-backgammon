@@ -220,6 +220,7 @@ impl Processor {
         msg!("Unpacking game account");
         let mut game = Game::unpack_unchecked(&game_info.data.borrow())?;
         if game.state != GameState::Doubled {
+            msg!("The opponent has not responded to the double yet.");
             return Err(BackgammonError::InvalidState.into());
         }
 
@@ -250,8 +251,12 @@ impl Processor {
         let account_iter = &mut accounts.iter();
         let player_info = next_account_info(account_iter)?;
         let game_info = next_account_info(account_iter)?;
-        let clock_program_info = next_account_info(account_iter)?;
-        let clock = &Clock::from_account_info(&clock_program_info)?;
+        // let clock_program_info = next_account_info(account_iter)?;
+        // let clock = &Clock::from_account_info(&clock_program_info)?;
+
+        for i in 0..4 {
+            msg!("move {} for {} steps", moves[i].start, moves[i].steps);
+        }
 
         if player_info.is_signer == false {
             return Err(BackgammonError::UnauthorizedAction.into());
@@ -259,7 +264,8 @@ impl Processor {
 
         msg!("Unpacking game account");
         let mut game = Game::unpack_unchecked(&game_info.data.borrow())?;
-        if game.state != GameState::Doubled {
+        if game.state != GameState::Rolled {
+            msg!("The dice are not rolled yet.");
             return Err(BackgammonError::InvalidState.into());
         }
 
@@ -324,5 +330,5 @@ impl Processor {
 
 fn roll_die(clock: &Clock, seed: u8) -> u8 {
     let divisor = 6_i64.pow(seed as u32);
-    ((clock.unix_timestamp / divisor) % 6) as u8
+    ((clock.unix_timestamp / divisor) % 6) as u8 + 1
 }
