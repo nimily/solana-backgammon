@@ -7,9 +7,11 @@ use solana_program::{
 
 use borsh::{BorshDeserialize, BorshSchema, BorshSerialize};
 
+use crate::error::BackgammonError;
+
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
 pub struct Game {
-    // 141 bytes
+    // 146 bytes
     pub game_id: u64,
     pub state: GameState,
     pub white_pubkey: Pubkey,
@@ -21,6 +23,8 @@ pub struct Game {
     pub last_moves: [Move; 4],
     pub last_doubled: Color,
     pub board: Board,
+    pub counter: u32, // counts the number of times the state is saved (used in random generator)
+    pub max_moves: u8,
 }
 
 impl Game {
@@ -132,7 +136,7 @@ impl IsInitialized for Game {
 impl Sealed for Game {}
 
 impl Pack for Game {
-    const LEN: usize = 141; // FIXME
+    const LEN: usize = 146; // FIXME
     fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
         let result = try_from_slice_unchecked::<Game>(src)?;
         Ok(result)
@@ -141,5 +145,29 @@ impl Pack for Game {
     fn pack_into_slice(&self, dst: &mut [u8]) {
         let mut writer = dst;
         self.serialize(&mut &mut writer).unwrap();
+    }
+}
+
+impl Game {
+    pub fn incr_and_pack(mut self, dst: &mut [u8]) -> Result<(), ProgramError> {
+        self.counter += 1;
+        return Game::pack(self, dst);
+    }
+
+    pub fn calc_max_moves(&mut self) {
+        if self.dice[0] == self.dice[1] {
+            self.calc_max_moves_equal_dice();
+        } else {
+            self.calc_max_moves_unequal_dice();
+        }
+    }
+
+    fn calc_max_moves_equal_dice(&mut self) {
+        self.max_moves = 4;
+        // let mut board = self.board.clone();
+    }
+
+    fn calc_max_moves_unequal_dice(&mut self) {
+        self.max_moves = 2;
     }
 }

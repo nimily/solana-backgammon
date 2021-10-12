@@ -22,7 +22,6 @@ pub enum BackgammonInstruction {
     ///
     /// 0. `[signer]` player
     /// 1. `[writable]` game
-    /// 2. `[]` sysvar_clock_program
     Roll {},
 
     ///
@@ -41,7 +40,6 @@ pub enum BackgammonInstruction {
     ///
     /// 0. `[signer]` player
     /// 1. `[writable]` game
-    /// 2. `[]` sysvar_clock_program
     RespondToDouble { accept: bool },
 
     ///
