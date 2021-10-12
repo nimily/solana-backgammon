@@ -4,8 +4,8 @@ const buffer = require('buffer');
 const crypto = require("crypto");
 
 const rpcUrl = "https://api.devnet.solana.com";
-const connection1 = new solana.Connection(rpcUrl, 'confirmed');
-const connection2 = new solana.Connection(rpcUrl, 'confirmed');
+let connection1 = new solana.Connection(rpcUrl, 'confirmed');
+let connection2 = new solana.Connection(rpcUrl, 'confirmed');
 
 let board = [-2, 0, 0, 0, 0, 5, 0, 3, 0, 0, 0, -5, 5, 0, 0, 0, -3, 0, -5, 0, 0, 0, 0, 2];
 let midBoard = [0, 0];
@@ -23,8 +23,8 @@ const program_id = new solana.PublicKey("Aqqg8L83rjkNfhLzAeZ4Aq37TBZyXnvLPWRTMru
 // player1 = getKeypair(player1);
 // player2 = getKeypair(player2);
 
-player1 = solana.Keypair.fromSeed(new Uint8Array(32).fill(1));
-player2 = solana.Keypair.fromSeed(new Uint8Array(32).fill(42));
+const player1 = solana.Keypair.fromSeed(new Uint8Array(32).fill(1));
+const player2 = solana.Keypair.fromSeed(new Uint8Array(32).fill(42));
 
 
 console.log("player1", player1.publicKey.toBase58());
@@ -46,11 +46,68 @@ function getKeypair(player) {
     }
 }
 
-// function retry(action) {
-//     try {
-//         await action;
-//     } except
-// }
+async function retry(transaction, player) {
+    if (player === -1) {
+        try {
+            await solana.sendAndConfirmTransaction(connection1, transaction,[player1]);
+        } catch (error) {
+            if (error.name.includes("FetchError")) {
+                console.log("reconnecting");
+                connection1 = new solana.Connection(rpcUrl, 'confirmed');
+                retry(transaction, player);
+            } else {
+                throw error;
+            }
+        }
+    } else {
+        if (player === 1) {
+            try {
+                await solana.sendAndConfirmTransaction(connection2, transaction,[player2]);
+            } catch (error) {
+                if (error.name.includes("FetchError")) {
+                    console.log("reconnecting");
+                    connection2 = new solana.Connection(rpcUrl, 'confirmed');
+                    retry(transaction, player);
+                } else {
+                    throw error;
+                }
+            }
+        }
+    }
+}
+
+async function getInfo(account, player) {
+    let info;
+    if (player === -1) {
+        try {
+            info = await connection1.getAccountInfo(account);
+        } catch (error) {
+            if (error.name.includes("FetchError")) {
+                console.log("reconnecting");
+                connection1 = new solana.Connection(rpcUrl, 'confirmed');
+                info = getInfo(account, player);
+            } else {
+                throw error;
+            }
+        }
+    } else {
+        if (player === 1) {
+            try {
+                info = await connection2.getAccountInfo(account);
+            } catch (error) {
+                if (error.name.includes("FetchError")) {
+                    console.log("reconnecting");
+                    connection2 = new solana.Connection(rpcUrl, 'confirmed');
+                    info = getInfo(account, player);
+                } else {
+                    throw error;
+                }
+            }
+        }
+    }
+    return info;
+}
+
 
 function display() {
     console.log("=".repeat(100));
@@ -58,17 +115,17 @@ function display() {
     const top = 13 + "\t" + 14 + "\t" + 15 + "\t" + 16 + "\t" + 17 + "\t" + 18 + "\t" + "mid" + "\t" + 19 + "\t" + 20 + "\t" + 21 + "\t" + 22 + "\t" + 23 + "\t" + 24 + "\t" + "right" + "\t" + "\t" + "die";
     console.log(top);
     console.log();
-    let sb = board.map(x => (x <= 0 ? "" : "+") + x);
-    let sm = ["-" + midBoard[0], "+" + midBoard[1]];
-    let sr = ["-" + rightBoard[0], "+" + rightBoard[1]];
-    let top1 = sb[12] + "\t" + sb[13] + "\t" + sb[14] + "\t" + sb[15] + "\t" + sb[16] + "\t" + sb[17] + "\t" + sm[0] + "\t" + sb[18] + "\t" + sb[19] + "\t" + sb[20] + "\t" + sb[21] + "\t" + sb[22] + "\t" + sb[23] + "\t" + sr[0] + "\t" + "\t" + dice[0];
+    const sb = board.map(x => (x <= 0 ? "" : "+") + x);
+    const sm = ["-" + midBoard[0], "+" + midBoard[1]];
+    const sr = ["-" + rightBoard[0], "+" + rightBoard[1]];
+    const top1 = sb[12] + "\t" + sb[13] + "\t" + sb[14] + "\t" + sb[15] + "\t" + sb[16] + "\t" + sb[17] + "\t" + sm[0] + "\t" + sb[18] + "\t" + sb[19] + "\t" + sb[20] + "\t" + sb[21] + "\t" + sb[22] + "\t" + sb[23] + "\t" + sr[0] + "\t" + "\t" + dice[0];
     console.log(top1);
     console.log();
     console.log();
     console.log("-".repeat(100));
     console.log();
     console.log();
-    let bot1 = sb[11] + "\t" + sb[10] + "\t" + sb[9] + "\t" + sb[8] + "\t" + sb[7] + "\t" + sb[6] + "\t" + sm[1] + "\t" + sb[5] + "\t" + sb[4] + "\t" + sb[3] + "\t" + sb[2] + "\t" + sb[1] + "\t" + sb[0] + "\t" + sr[1] + "\t" + "\t" + dice[1];
+    const bot1 = sb[11] + "\t" + sb[10] + "\t" + sb[9] + "\t" + sb[8] + "\t" + sb[7] + "\t" + sb[6] + "\t" + sm[1] + "\t" + sb[5] + "\t" + sb[4] + "\t" + sb[3] + "\t" + sb[2] + "\t" + sb[1] + "\t" + sb[0] + "\t" + sr[1] + "\t" + "\t" + dice[1];
     console.log(bot1);
     console.log();
     const bot = 12 + "\t" + 11 + "\t" + 10 + "\t" + 9 + "\t" + 8 + "\t" + 7 + "\t" + "mid" + "\t" + 6 + "\t" + 5 + "\t" + 4 + "\t" + 3 + "\t" + 2 + "\t" + 1 + "\t" + "right" + "\t" + "\t" + "die";
@@ -125,6 +182,43 @@ function checkMove(player, steps) {
     }
 }
 
+function checkStep(step) {
+    if (step <= 6 && step >= 1) {
+        return true;
+    }
+    console.log("step out of boundary");
+    return false;
+}
+
+function checkStart(start) {
+    if (start <= 24 || start >= 1) {
+        return true;
+    }
+    console.log("start out of boundary");
+    return false;
+}
+
+async function checkBoard(data) {
+    const info = data.slice(87, 141);
+    if ((info[52] != rightBoard[0]) || (info[53] != rightBoard[1])) {
+        console.log("right board does not match", info[52], info[53]);
+        rightBoard[0] = info[52];
+        rightBoard[1] = info[53];
+    }
+    if ((info[1] != midBoard[0]) || (info[51] != midBoard[1])) {
+        console.log("mid board does not match", info[1], info[51]);
+        midBoard[0] = info[1];
+        midBoard[1] = info[51];
+    }
+    for (let i = 0; i < 24; ++i) {
+        const actual = (info[2+i*2] * 2 - 3) * info[3+i*2];
+        if (actual != board[i]) {
+            console.log("board does not match", i, actual);
+            board[i] = actual;
+        }
+    }
+}
+
 
 (async () => {
     
@@ -137,8 +231,8 @@ function checkMove(player, steps) {
 
     // await new Promise(resolve => setTimeout(resolve, 60000));
 
-    // const airdropSignature2 = await connection2.requestAirdrop(player2.publicKey, 1000000000);
-    // await connection2.confirmTransaction(airdropSignature2);
+    const airdropSignature2 = await connection2.requestAirdrop(player2.publicKey, 1000000000);
+    await connection2.confirmTransaction(airdropSignature2);
 
     const initialize = new solana.TransactionInstruction({
         programId: program_id,
@@ -151,13 +245,13 @@ function checkMove(player, steps) {
         ],
         data: buffer.Buffer.from([0, ...game_id])
     });
-    await solana.sendAndConfirmTransaction(connection1, new solana.Transaction().add(initialize),[player1]);
+    await retry(new solana.Transaction().add(initialize), -1);
     console.log("initialized");
 
 
     let turn = 0;
     while (turn === 0) {
-        let roll1 = new solana.TransactionInstruction({
+        const roll1 = new solana.TransactionInstruction({
             programId: program_id,
             keys: [
                 {pubkey: player1.publicKey, isSigner: false, isWritable: false},
@@ -167,8 +261,8 @@ function checkMove(player, steps) {
             data: buffer.Buffer.from([1])
             
         });
-        await solana.sendAndConfirmTransaction(connection1, new solana.Transaction().add(roll1),[player1]);
-        let roll2 = new solana.TransactionInstruction({
+        await retry(new solana.Transaction().add(roll1), -1);
+        const roll2 = new solana.TransactionInstruction({
             programId: program_id,
             keys: [
                 {pubkey: player2.publicKey, isSigner: false, isWritable: false},
@@ -178,21 +272,16 @@ function checkMove(player, steps) {
             data: buffer.Buffer.from([1])
             
         });
-        await solana.sendAndConfirmTransaction(connection2, new solana.Transaction().add(roll2),[player2]);
+        await retry(new solana.Transaction().add(roll2), 1);
         console.log("deciding first player")
-        game_info = await connection1.getAccountInfo(game);
+        const game_info = await getInfo(game, -1);
         dice[0] = game_info.data[75];
         dice[1] = game_info.data[76];
         if (dice[0] === dice[1]) {
             continue;
         }
-        if (dice[0] > dice[1]) {
-            turn = -1;
-            console.log("player -1 is first");
-        } else {
-            turn = 1;
-            console.log("player 1 is first");
-        }
+        turn = game_info.data[73] * 2 - 3;
+        console.log(`player ${turn} is first`);
     }
     while ((rightBoard[0] < 15) && (rightBoard[1] < 15)) {
 
@@ -210,6 +299,9 @@ function checkMove(player, steps) {
             if (turn === -1) {
                 if (midBoard[0] > 0) {
                     const step = parseInt(readline.question("How many steps do player -1 want to move: "));
+                    if (!checkStep(step)) {
+                        continue;
+                    }
                     if (board[step-1] > 1) {
                         console.log("You can not move here");
                         continue;
@@ -232,11 +324,17 @@ function checkMove(player, steps) {
                     action_cnt += 1;
                 } else {
                     const start = parseInt(readline.question("Which checker do player -1 want to move: "));
+                    if (!checkStart(start)) {
+                        continue;
+                    }
                     if (board[start-1] >= 0) {
                         console.log("There is no such checker");
                         continue;
                     }
                     const step = parseInt(readline.question("How many steps do player -1 want to move: "));
+                    if (!checkStep(step)) {
+                        continue;
+                    }
                     if ((start - 1 + step < 24) && (board[start - 1 + step] > 1)) {
                         console.log("You can not move here");
                         continue;
@@ -249,7 +347,7 @@ function checkMove(player, steps) {
                     avail.splice(i, 1);
                     board[start-1] += 1;
                     if (start + step - 1 >= 24) {
-                        right[0] += 1;
+                        rightBoard[0] += 1;
                     } else if (board[start - 1 + step] === 1) {
                         board[start-1+step] = -1;
                         midBoard[1] += 1;
@@ -263,6 +361,9 @@ function checkMove(player, steps) {
             } else {
                 if (midBoard[1] > 0) {
                     const step = parseInt(readline.question("How many steps do player +1 want to move: "));
+                    if (!checkStep(step)) {
+                        continue;
+                    }
                     if (board[24-step] < -1) {
                         console.log("You can not move here");
                         continue;
@@ -285,11 +386,17 @@ function checkMove(player, steps) {
                     action_cnt += 1;
                 } else {
                     const start = parseInt(readline.question("Which checker do player +1 want to move: "));
+                    if (!checkStart(start)) {
+                        continue;
+                    }
                     if (board[start-1] <= 0) {
                         console.log("There is no such checker");
                         continue;
                     }
                     const step = parseInt(readline.question("How many steps do player +1 want to move: "));
+                    if (!checkStep(step)) {
+                        continue;
+                    }
                     if ((start - 1 - step >= 0) && (board[start - 1 - step] < -1)) {
                         console.log("You can not move here");
                         continue;
@@ -302,7 +409,7 @@ function checkMove(player, steps) {
                     avail.splice(i, 1);
                     board[start-1] -= 1;
                     if (start - step - 1 < 0) {
-                        right[1] += 1;
+                        rightBoard[1] += 1;
                     } else if (board[start-1-step] === -1) {
                         board[start-1-step] = 1;
                         midBoard[0] += 1;
@@ -316,8 +423,9 @@ function checkMove(player, steps) {
             }
             display();
         }
+
         if (turn === -1) {
-            let move = new solana.TransactionInstruction({
+            const move = new solana.TransactionInstruction({
                 programId: program_id,
                 keys: [
                     {pubkey: player1.publicKey, isSigner: false, isWritable: false},
@@ -326,10 +434,14 @@ function checkMove(player, steps) {
                 ],
                 data: buffer.Buffer.from([4, ...actions])
             });
-            await solana.sendAndConfirmTransaction(connection1, new solana.Transaction().add(move),[player1]);
+            let game_info = await getInfo(game, -1);
+            console.log(game_info.data[73]);
+            await retry(new solana.Transaction().add(move), -1);
             console.log("saving moves");
+            game_info = await getInfo(game, -1);
+            checkBoard(game_info.data);
         } else {
-            let move = new solana.TransactionInstruction({
+            const move = new solana.TransactionInstruction({
                 programId: program_id,
                 keys: [
                     {pubkey: player2.publicKey, isSigner: false, isWritable: false},
@@ -339,9 +451,14 @@ function checkMove(player, steps) {
                 data: buffer.Buffer.from([4, ...actions])
                 
             });
-            await solana.sendAndConfirmTransaction(connection2, new solana.Transaction().add(move),[player2]);
+            let game_info = await getInfo(game, 1);
+            console.log(game_info.data[73]);
+            await retry(new solana.Transaction().add(move), 1);
             console.log("saving moves");
+            game_info = await getInfo(game, 1);
+            checkBoard(game_info.data);
         }
+
         turn = -turn;
         if (turn === -1) {
             let roll = new solana.TransactionInstruction({
@@ -354,9 +471,9 @@ function checkMove(player, steps) {
                 data: buffer.Buffer.from([1])
                 
             });
-            await solana.sendAndConfirmTransaction(connection1, new solana.Transaction().add(roll),[player1]);
+            await retry(new solana.Transaction().add(roll), -1);
             console.log("rolliing dices");
-            let game_info = await connection1.getAccountInfo(game);
+            const game_info = await getInfo(game, -1);
             dice[0] = game_info.data[75];
             dice[1] = game_info.data[76];
         } else {
@@ -370,9 +487,9 @@ function checkMove(player, steps) {
                 data: buffer.Buffer.from([1])
                 
             });
-            await solana.sendAndConfirmTransaction(connection2, new solana.Transaction().add(roll),[player2]);
+            await retry(new solana.Transaction().add(roll), 1);
             console.log("rolliing dices");
-            let game_info = await connection2.getAccountInfo(game);
+            const game_info = await getInfo(game, 1);
             dice[0] = game_info.data[75];
             dice[1] = game_info.data[76];
         }
