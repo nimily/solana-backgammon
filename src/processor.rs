@@ -152,7 +152,7 @@ impl Processor {
             if game.dice[player_index] != 0 {
                 return Err(BackgammonError::InvalidState.into());
             }
-            game.dice[player_index] = roll_die(clock);
+            game.dice[player_index] = roll_die(clock, 0);
             if game.dice[0] != 0 && game.dice[1] != 0 {
                 game.state = GameState::Rolled;
                 if game.dice[0] > game.dice[1] {
@@ -168,8 +168,8 @@ impl Processor {
             if player_color != game.turn {
                 return Err(BackgammonError::UnauthorizedAction.into());
             }
-            game.dice[0] = roll_die(clock);
-            game.dice[1] = roll_die(clock);
+            game.dice[0] = roll_die(clock, 0);
+            game.dice[1] = roll_die(clock, 1);
             game.state = GameState::Rolled;
             game.turn = Color::toggle(game.turn);
         }
@@ -233,8 +233,8 @@ impl Processor {
             game.state = GameState::Finished;
         } else {
             game.multiplier *= 2;
-            game.dice[0] = roll_die(clock);
-            game.dice[1] = roll_die(clock);
+            game.dice[0] = roll_die(clock, 0);
+            game.dice[1] = roll_die(clock, 1);
             game.state = GameState::Rolled;
             game.turn = Color::toggle(game.turn);
         }
@@ -322,6 +322,7 @@ impl Processor {
     }
 }
 
-fn roll_die(clock: &Clock) -> u8 {
-    1
+fn roll_die(clock: &Clock, seed: u8) -> u8 {
+    let divisor = 6_i64.pow(seed as u32);
+    ((clock.unix_timestamp / divisor) % 6) as u8
 }
