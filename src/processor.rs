@@ -6,7 +6,6 @@ use borsh::BorshDeserialize;
 use solana_program::program_pack::IsInitialized;
 use solana_program::{
     account_info::{next_account_info, AccountInfo},
-    clock::Clock,
     entrypoint::ProgramResult,
     msg,
     program_error::ProgramError,
@@ -124,17 +123,15 @@ impl Processor {
             points[25 - indexes[i]].n_pieces = n_pieces[i];
         }
         msg!("Serializing game");
-        Game::pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
+        Game::incr_and_pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
 
         Ok(())
     }
 
-    fn process_roll(accounts: &[AccountInfo], _program_id: &Pubkey) -> ProgramResult {
+    fn process_roll(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramResult {
         let account_iter = &mut accounts.iter();
         let player_info = next_account_info(account_iter)?;
         let game_info = next_account_info(account_iter)?;
-        let clock_program_info = next_account_info(account_iter)?;
-        let clock = &Clock::from_account_info(&clock_program_info)?;
 
         if player_info.is_signer == false {
             return Err(BackgammonError::UnauthorizedAction.into());
@@ -143,16 +140,17 @@ impl Processor {
         msg!("Unpacking game account");
         let mut game = Game::unpack_unchecked(&game_info.data.borrow())?;
         if game.state != GameState::Started && game.state != GameState::DoubleOrRoll {
+            msg!("Rolling is only possible when Started or DoubleOrRoll (state = {})", game.state);
             return Err(BackgammonError::InvalidState.into());
         }
 
         let player_color = game.get_color(player_info.key);
         if game.state == GameState::Started {
-            let player_index = player_color.index();
+            let player_index = player_color.index()?;
             if game.dice[player_index] != 0 {
                 return Err(BackgammonError::InvalidState.into());
             }
-            game.dice[player_index] = roll_die(clock, 0);
+            game.dice[player_index] = roll_die(program_id, &game, 0);
             if game.dice[0] != 0 && game.dice[1] != 0 {
                 game.state = GameState::Rolled;
                 if game.dice[0] > game.dice[1] {
@@ -168,12 +166,12 @@ impl Processor {
             if player_color != game.turn {
                 return Err(BackgammonError::UnauthorizedAction.into());
             }
-            game.dice[0] = roll_die(clock, 0);
-            game.dice[1] = roll_die(clock, 1);
+            game.dice[0] = roll_die(program_id, &game, 0);
+            game.dice[1] = roll_die(program_id, &game, 1);
             game.state = GameState::Rolled;
-            game.turn = Color::toggle(game.turn);
+            game.calc_max_moves();
         }
-        Game::pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
+        Game::incr_and_pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
         Ok(())
     }
 
@@ -198,20 +196,18 @@ impl Processor {
         }
 
         game.state = GameState::Doubled;
-        Game::pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
+        Game::incr_and_pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
         Ok(())
     }
 
     fn process_respond_to_double(
         accounts: &[AccountInfo],
         accept: bool,
-        _program_id: &Pubkey,
+        program_id: &Pubkey,
     ) -> ProgramResult {
         let account_iter = &mut accounts.iter();
         let player_info = next_account_info(account_iter)?;
         let game_info = next_account_info(account_iter)?;
-        let clock_program_info = next_account_info(account_iter)?;
-        let clock = &Clock::from_account_info(&clock_program_info)?;
 
         if player_info.is_signer == false {
             return Err(BackgammonError::UnauthorizedAction.into());
@@ -225,7 +221,7 @@ impl Processor {
         }
 
         let player_color = game.get_color(player_info.key);
-        if player_color != Color::toggle(game.turn) {
+        if player_color != game.turn.opponent()? {
             return Err(BackgammonError::UnauthorizedAction.into());
         }
 
@@ -235,25 +231,24 @@ impl Processor {
         } else {
             game.multiplier *= 2;
             game.last_doubled = game.turn;
-            game.dice[0] = roll_die(clock, 0);
-            game.dice[1] = roll_die(clock, 1);
+            game.dice[0] = roll_die(program_id, &game, 0);
+            game.dice[1] = roll_die(program_id, &game, 1);
             game.state = GameState::Rolled;
-            game.turn = Color::toggle(game.turn);
+            game.turn = game.turn.opponent()?;
+            game.calc_max_moves();
         }
-        Game::pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
+        Game::incr_and_pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
         Ok(())
     }
 
     fn process_apply_moves(
         accounts: &[AccountInfo],
         moves: [Move; 4],
-        _program_id: &Pubkey,
+        program_id: &Pubkey,
     ) -> ProgramResult {
         let account_iter = &mut accounts.iter();
         let player_info = next_account_info(account_iter)?;
         let game_info = next_account_info(account_iter)?;
-        let clock_program_info = next_account_info(account_iter)?;
-        let clock = &Clock::from_account_info(&clock_program_info)?;
 
         for i in 0..4 {
             msg!("move {} for {} steps", moves[i].start, moves[i].steps);
@@ -281,8 +276,8 @@ impl Processor {
             values.push(game.dice[0]);
             values.push(game.dice[0]);
         }
-        let direction = Color::sign(player_color);
         for i in 0..4 {
+            msg!("applying move {} for {} steps", moves[i].start, moves[i].steps);
             if moves[i].steps == 0 {
                 // TODO check if this is desired.
                 msg!("Only {} moves were available", i);
@@ -293,60 +288,44 @@ impl Processor {
                 return Err(BackgammonError::InvalidMove.into());
             }
 
-            let steps = moves[i].steps as i32;
-            let src = moves[i].start as i32;
-            let dst = src + direction * steps;
-
-            let mut points = &mut game.board.points;
-
-            if points[src as usize].color != game.turn {
-                msg!("You can not move an opponent's checker");
-                return Err(BackgammonError::InvalidMove.into());
-            }
-
-            if (1 <= dst) && (dst <= 24) {
-                if points[dst as usize].color == Color::toggle(player_color) {
-                    if points[dst as usize].n_pieces > 1 {
-                        msg!("The target point cannot have more than one opponent's checker");
-                        return Err(BackgammonError::InvalidMove.into());
-                    }
-                    let middle = Color::middle_point_index(points[dst as usize].color);
-                    points[middle].color = points[dst as usize].color;
-                    points[middle].n_pieces += 1;
-                    points[dst as usize].n_pieces = 0;
-                }
-                points[dst as usize].n_pieces += 1;
-                points[dst as usize].color = player_color;
-            } else {
-                game.board.completed[Color::index(&game.turn)] += 1;
-            }
-            points[src as usize].n_pieces -= 1;
-            if points[src as usize].n_pieces == 0 {
-                points[src as usize].color = Color::None;
-            }
+            game.board.apply_move(game.turn, moves[i])?;
 
             let index = values.iter().position(|x| *x == moves[i].steps).unwrap();
             values.remove(index);
         }
         msg!("Moves applied, updating the state...");
         game.last_moves = moves;
-        game.turn = Color::toggle(game.turn);
+        game.turn = game.turn.opponent()?;
         if game.last_doubled == game.turn || game.multiplier == 64 {
-            game.dice[0] = roll_die(clock, 0);
-            game.dice[1] = roll_die(clock, 1);
+            msg!("case 1");
+            game.dice[0] = roll_die(program_id, &game, 0);
+            game.dice[1] = roll_die(program_id, &game, 1);
             game.state = GameState::Rolled;
+            game.calc_max_moves();
         } else {
+            msg!("case 2");
             game.dice[0] = 0;
             game.dice[1] = 0;
             game.state = GameState::DoubleOrRoll;
         }
+        // return Err(BackgammonError::InvalidMove.into());
         msg!("Saving the game...");
-        Game::pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
+        Game::incr_and_pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
         Ok(())
     }
 }
 
-fn roll_die(clock: &Clock, seed: u8) -> u8 {
-    let divisor = 6_i64.pow(seed as u32);
-    ((clock.unix_timestamp / divisor) % 6) as u8 + 1
+fn roll_die(program_id: &Pubkey, game: &Game, seed: u8) -> u8 {
+    let seeds = &[
+        game.white_pubkey.as_ref(),
+        game.black_pubkey.as_ref(),
+        &game.counter.to_le_bytes(),
+        &[seed],
+    ];
+    let (address, _bump) = Pubkey::find_program_address(seeds, program_id);
+    let mut total: i64 = 0;
+    for i in 0..32 {
+        total += (address.as_ref()[i] as i64) * 256_i64.pow((i % 4) as u32);
+    }
+    ((total % 6) + 1) as u8
 }
