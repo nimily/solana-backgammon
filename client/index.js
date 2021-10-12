@@ -215,7 +215,6 @@ function checkMove(player, steps) {
                     }
                 } else {
                     const start = parseInt(readline.question("Which checker do player -1 want to move: "));
-                    console.log(board[start-1]);
                     if (board[start-1] >= 0) {
                         console.log("There is no such checker");
                         continue;
