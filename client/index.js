@@ -24,7 +24,7 @@ const program_id = new solana.PublicKey("Aqqg8L83rjkNfhLzAeZ4Aq37TBZyXnvLPWRTMru
 // player2 = getKeypair(player2);
 
 player1 = solana.Keypair.fromSeed(new Uint8Array(32).fill(1));
-player2 = solana.Keypair.fromSeed(new Uint8Array(32).fill(2));
+player2 = solana.Keypair.fromSeed(new Uint8Array(32).fill(42));
 
 
 console.log("player1", player1.publicKey.toBase58());
@@ -49,7 +49,7 @@ function getKeypair(player) {
 function display() {
     console.log("=".repeat(100));
     console.log("=".repeat(100));
-    const top = 13 + "\t" + 14 + "\t" + 15 + "\t" + 16 + "\t" + 17 + "\t" + 18 + "\t" + "mid" + "\t" + 19 + "\t" + 20 + "\t" + 21 + "\t" + 22 + "\t" + 23 + "\t" + 24 + "\t" + "right" + "\t" + "\t" + "dice";
+    const top = 13 + "\t" + 14 + "\t" + 15 + "\t" + 16 + "\t" + 17 + "\t" + 18 + "\t" + "mid" + "\t" + 19 + "\t" + 20 + "\t" + 21 + "\t" + 22 + "\t" + 23 + "\t" + 24 + "\t" + "right" + "\t" + "\t" + "die";
     console.log(top);
     console.log();
     let sb = board.map(x => (x <= 0 ? "" : "+") + x);
@@ -65,7 +65,7 @@ function display() {
     let bot1 = sb[11] + "\t" + sb[10] + "\t" + sb[9] + "\t" + sb[8] + "\t" + sb[7] + "\t" + sb[6] + "\t" + sm[1] + "\t" + sb[5] + "\t" + sb[4] + "\t" + sb[3] + "\t" + sb[2] + "\t" + sb[1] + "\t" + sb[0] + "\t" + sr[1] + "\t" + "\t" + dice[1];
     console.log(bot1);
     console.log();
-    const bot = 12 + "\t" + 11 + "\t" + 10 + "\t" + 9 + "\t" + 8 + "\t" + 7 + "\t" + "mid" + "\t" + 6 + "\t" + 5 + "\t" + 4 + "\t" + 3 + "\t" + 2 + "\t" + 1 + "\t" + "right" + "\t" + "\t" + "dice";
+    const bot = 12 + "\t" + 11 + "\t" + 10 + "\t" + 9 + "\t" + 8 + "\t" + 7 + "\t" + "mid" + "\t" + 6 + "\t" + 5 + "\t" + 4 + "\t" + 3 + "\t" + 2 + "\t" + 1 + "\t" + "right" + "\t" + "\t" + "die";
     console.log(bot);
     console.log("=".repeat(100));
     console.log("=".repeat(100));
@@ -124,6 +124,7 @@ function checkMove(player, steps) {
     
     const [game, game_seed] = await solana.PublicKey.findProgramAddress([player1.publicKey.toBytes(), player2.publicKey.toBytes(), game_id], program_id);
     console.log("game", game.toBase58());
+
     // const airdropSignature1 = await connection1.requestAirdrop(player1.publicKey, 1000000000);
     // await connection1.confirmTransaction(airdropSignature1);
     
@@ -148,42 +149,49 @@ function checkMove(player, steps) {
     console.log("initialized");
 
 
-    turn = -1;
-    while ((rightBoard[0] < 15) && (rightBoard[1] < 15)) {
-        if (turn === -1) {
-            let roll = new solana.TransactionInstruction({
-                programId: program_id,
-                keys: [
-                    {pubkey: player1.publicKey, isSigner: false, isWritable: false},
-                    {pubkey: game, isSigner: false, isWritable: true},
-                    {pubkey: clock, isSigner: false, isWritable: false}
-                ],
-                data: buffer.Buffer.from([1])
-                
-            });
-            await solana.sendAndConfirmTransaction(connection1, new solana.Transaction().add(roll),[player1]);
-            console.log("rolliing dices");
-            game_info = await connection1.getAccountInfo(game);
-            dice[0] = game_info.data[75];
-            dice[1] = game_info.data[76];
-        } else {
-            let roll = new solana.TransactionInstruction({
-                programId: program_id,
-                keys: [
-                    {pubkey: player2.publicKey, isSigner: false, isWritable: false},
-                    {pubkey: game, isSigner: false, isWritable: true},
-                    {pubkey: clock, isSigner: false, isWritable: false}
-                ],
-                data: buffer.Buffer.from([1])
-                
-            });
-            await solana.sendAndConfirmTransaction(connection2, new solana.Transaction().add(roll),[player2]);
-            console.log("rolliing dices");
-            game_info = await connection2.getAccountInfo(game);
-            dice[0] = game_info.data[75];
-            dice[1] = game_info.data[76];
+    let turn = 0;
+    while (turn === 0) {
+        let roll1 = new solana.TransactionInstruction({
+            programId: program_id,
+            keys: [
+                {pubkey: player1.publicKey, isSigner: false, isWritable: false},
+                {pubkey: game, isSigner: false, isWritable: true},
+                {pubkey: clock, isSigner: false, isWritable: false}
+            ],
+            data: buffer.Buffer.from([1])
+            
+        });
+        await solana.sendAndConfirmTransaction(connection1, new solana.Transaction().add(roll1),[player1]);
+        let roll2 = new solana.TransactionInstruction({
+            programId: program_id,
+            keys: [
+                {pubkey: player2.publicKey, isSigner: false, isWritable: false},
+                {pubkey: game, isSigner: false, isWritable: true},
+                {pubkey: clock, isSigner: false, isWritable: false}
+            ],
+            data: buffer.Buffer.from([1])
+            
+        });
+        await solana.sendAndConfirmTransaction(connection2, new solana.Transaction().add(roll2),[player2]);
+        console.log("deciding first player")
+        game_info = await connection1.getAccountInfo(game);
+        dice[0] = game_info.data[75];
+        dice[1] = game_info.data[76];
+        if (dice[0] === dice[1]) {
+            continue;
         }
+        if (dice[0] > dice[1]) {
+            turn = -1;
+            console.log("player -1 is first");
+        } else {
+            turn = 1;
+            console.log("player 1 is first");
+        }
+    }
+    while ((rightBoard[0] < 15) && (rightBoard[1] < 15)) {
+
         display();
+        
         let avail;
         if (dice[0] === dice[1]) {
             avail = [...dice, ...dice];
@@ -312,7 +320,7 @@ function checkMove(player, steps) {
                 data: buffer.Buffer.from([4, ...actions])
             });
             console.log([4, ...actions]);
-            await solana.sendAndConfirmTransaction(connection1, new solana.Transaction().add(move),[player1]);
+            console.log(await solana.sendAndConfirmTransaction(connection1, new solana.Transaction().add(move),[player1]));
             console.log("saving moves");
         } else {
             let move = new solana.TransactionInstruction({
@@ -324,9 +332,42 @@ function checkMove(player, steps) {
                 data: buffer.Buffer.from([4, ...actions])
                 
             });
-            await solana.sendAndConfirmTransaction(connection2, new solana.Transaction().add(move),[player2]);
+            console.log(await solana.sendAndConfirmTransaction(connection2, new solana.Transaction().add(move),[player2]));
             console.log("saving moves");
         }
         turn = -turn;
+        if (turn === -1) {
+            let roll = new solana.TransactionInstruction({
+                programId: program_id,
+                keys: [
+                    {pubkey: player1.publicKey, isSigner: false, isWritable: false},
+                    {pubkey: game, isSigner: false, isWritable: true},
+                    {pubkey: clock, isSigner: false, isWritable: false}
+                ],
+                data: buffer.Buffer.from([1])
+                
+            });
+            await solana.sendAndConfirmTransaction(connection1, new solana.Transaction().add(roll),[player1]);
+            console.log("rolliing dices");
+            let game_info = await connection1.getAccountInfo(game);
+            dice[0] = game_info.data[75];
+            dice[1] = game_info.data[76];
+        } else {
+            let roll = new solana.TransactionInstruction({
+                programId: program_id,
+                keys: [
+                    {pubkey: player2.publicKey, isSigner: false, isWritable: false},
+                    {pubkey: game, isSigner: false, isWritable: true},
+                    {pubkey: clock, isSigner: false, isWritable: false}
+                ],
+                data: buffer.Buffer.from([1])
+                
+            });
+            await solana.sendAndConfirmTransaction(connection2, new solana.Transaction().add(roll),[player2]);
+            console.log("rolliing dices");
+            let game_info = await connection2.getAccountInfo(game);
+            dice[0] = game_info.data[75];
+            dice[1] = game_info.data[76];
+        }
     }
 })();
