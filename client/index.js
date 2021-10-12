@@ -51,7 +51,7 @@ async function retry(transaction, player) {
         try {
             await solana.sendAndConfirmTransaction(connection1, transaction,[player1]);
         } catch (error) {
-            if (error.name.includes("FetchError")) {
+            if (error.message.includes("FetchError")) {
                 console.log("reconnecting");
                 connection1 = new solana.Connection(rpcUrl, 'confirmed');
                 retry(transaction, player);
@@ -64,7 +64,7 @@ async function retry(transaction, player) {
             try {
                 await solana.sendAndConfirmTransaction(connection2, transaction,[player2]);
             } catch (error) {
-                if (error.name.includes("FetchError")) {
+                if (error.message.includes("FetchError")) {
                     console.log("reconnecting");
                     connection2 = new solana.Connection(rpcUrl, 'confirmed');
                     retry(transaction, player);
@@ -82,7 +82,7 @@ async function getInfo(account, player) {
         try {
             info = await connection1.getAccountInfo(account);
         } catch (error) {
-            if (error.name.includes("FetchError")) {
+            if (error.message.includes("FetchError")) {
                 console.log("reconnecting");
                 connection1 = new solana.Connection(rpcUrl, 'confirmed');
                 info = getInfo(account, player);
@@ -95,7 +95,7 @@ async function getInfo(account, player) {
             try {
                 info = await connection2.getAccountInfo(account);
             } catch (error) {
-                if (error.name.includes("FetchError")) {
+                if (error.message.includes("FetchError")) {
                     console.log("reconnecting");
                     connection2 = new solana.Connection(rpcUrl, 'confirmed');
                     info = getInfo(account, player);
@@ -434,11 +434,9 @@ async function checkBoard(data) {
                 ],
                 data: buffer.Buffer.from([4, ...actions])
             });
-            let game_info = await getInfo(game, -1);
-            console.log(game_info.data[73]);
             await retry(new solana.Transaction().add(move), -1);
             console.log("saving moves");
-            game_info = await getInfo(game, -1);
+            const game_info = await getInfo(game, -1);
             checkBoard(game_info.data);
         } else {
             const move = new solana.TransactionInstruction({
@@ -451,11 +449,9 @@ async function checkBoard(data) {
                 data: buffer.Buffer.from([4, ...actions])
                 
             });
-            let game_info = await getInfo(game, 1);
-            console.log(game_info.data[73]);
             await retry(new solana.Transaction().add(move), 1);
             console.log("saving moves");
-            game_info = await getInfo(game, 1);
+            const game_info = await getInfo(game, 1);
             checkBoard(game_info.data);
         }
 
