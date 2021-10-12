@@ -282,6 +282,11 @@ impl Processor {
         }
         let direction = Color::sign(player_color);
         for i in 0..4 {
+            if moves[i].steps == 0 {
+                // TODO check if this is desired.
+                msg!("Only {} moves were available", i);
+                break;
+            }
             if values.contains(&moves[i].steps) == false {
                 msg!("You can not move a checker for {} steps", moves[i].steps);
                 return Err(BackgammonError::InvalidMove.into());
@@ -322,11 +327,13 @@ impl Processor {
             let index = values.iter().position(|x| *x == moves[i].steps).unwrap();
             values.remove(index);
         }
+        msg!("Moves applied, updating the state...");
         game.last_moves = moves;
         game.dice[0] = 0;
         game.dice[1] = 0;
         game.turn = Color::toggle(game.turn);
         game.state = GameState::DoubleOrRoll;
+        msg!("Saving the game...");
         Game::pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
         Ok(())
     }
