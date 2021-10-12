@@ -9,7 +9,7 @@ use borsh::{BorshDeserialize, BorshSchema, BorshSerialize};
 
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
 pub struct Game {
-    // 140 bytes
+    // 141 bytes
     pub game_id: u64,
     pub state: GameState,
     pub white_pubkey: Pubkey,
@@ -19,6 +19,7 @@ pub struct Game {
     pub dice: [u8; 2],
     pub multiplier: u8,
     pub last_moves: [Move; 4],
+    pub last_doubled: Color,
     pub board: Board,
 }
 
@@ -131,7 +132,7 @@ impl IsInitialized for Game {
 impl Sealed for Game {}
 
 impl Pack for Game {
-    const LEN: usize = 140; // FIXME
+    const LEN: usize = 141; // FIXME
     fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
         let result = try_from_slice_unchecked::<Game>(src)?;
         Ok(result)

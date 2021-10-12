@@ -234,6 +234,7 @@ impl Processor {
             game.state = GameState::Finished;
         } else {
             game.multiplier *= 2;
+            game.last_doubled = game.turn;
             game.dice[0] = roll_die(clock, 0);
             game.dice[1] = roll_die(clock, 1);
             game.state = GameState::Rolled;
@@ -251,8 +252,8 @@ impl Processor {
         let account_iter = &mut accounts.iter();
         let player_info = next_account_info(account_iter)?;
         let game_info = next_account_info(account_iter)?;
-        // let clock_program_info = next_account_info(account_iter)?;
-        // let clock = &Clock::from_account_info(&clock_program_info)?;
+        let clock_program_info = next_account_info(account_iter)?;
+        let clock = &Clock::from_account_info(&clock_program_info)?;
 
         for i in 0..4 {
             msg!("move {} for {} steps", moves[i].start, moves[i].steps);
@@ -329,10 +330,16 @@ impl Processor {
         }
         msg!("Moves applied, updating the state...");
         game.last_moves = moves;
-        game.dice[0] = 0;
-        game.dice[1] = 0;
         game.turn = Color::toggle(game.turn);
-        game.state = GameState::DoubleOrRoll;
+        if game.last_doubled == game.turn || game.multiplier == 64 {
+            game.dice[0] = roll_die(clock, 0);
+            game.dice[1] = roll_die(clock, 1);
+            game.state = GameState::Rolled;
+        } else {
+            game.dice[0] = 0;
+            game.dice[1] = 0;
+            game.state = GameState::DoubleOrRoll;
+        }
         msg!("Saving the game...");
         Game::pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
         Ok(())
