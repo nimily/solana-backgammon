@@ -5,6 +5,7 @@ const crypt = require('crypto');
 const bs58 = require('bs58');
 
 const rpcUrl = "https://api.devnet.solana.com";
+const system = solana.PublicKey.default;
 const connection = new solana.Connection(rpcUrl, 'confirmed');
 const player = solana.Keypair.fromSeed(new Uint8Array(32).fill(1));
 const system = solana.PublicKey.default;
@@ -14,16 +15,15 @@ console.log(queue.secretKey.toBase58());
 
 const createAccount = new solana.Transaction().add(
     solana.SystemProgram.createAccount({
-      fromPubkey: player.publicKey,
-      basePubkey: queue.publicKey,
-      lamport: 1.0,
-      newAccountPubkey: greetedPubkey,
-      lamports,
-      space: GREETING_SIZE,
-      programId,
+        fromPubkey: player.publicKey,
+        newAccountPubkey: queue.publicKey,
+        lamports: 1000000000,
+        space: 64,
+        system,
     }),
   );
-  await sendAndConfirmTransaction(connection, transaction, [payer]);
+await sendAndConfirmTransaction(connection, transaction, [player]);
+await connection.getAccountInfo();
 
 const program_id = new solana.PublicKey("Aqqg8L83rjkNfhLzAeZ4Aq37TBZyXnvLPWRTMruTWmJ8");
 const system = solana.PublicKey.default;
