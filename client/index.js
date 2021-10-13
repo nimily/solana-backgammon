@@ -517,7 +517,7 @@ function checkBoard(data) {
     console.log("game finishes");
     game_info = await getInfo(game, turn);
     const winner = game_info.data[74] * 2 - 3;
-    console.log(`winner is player ${winner}`);
+    console.log(`player ${winner} wins ${multiplier}`);
 
 //     let turn = 0;
 //     while (turn === 0) {
