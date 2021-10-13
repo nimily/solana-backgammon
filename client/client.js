@@ -282,7 +282,7 @@ function checkBoard(data) {
             case 2:
                 if (turn === order) {
                     const request = readline.question(`Do you want to double (Y/N, default N): `);
-                    if (request[0] == "Y" || request[0] == "y") {
+                    if (request[0] === "Y" || request[0] === "y") {
                         const double = new solana.TransactionInstruction({
                             programId: program_id,
                             keys: [
@@ -318,7 +318,7 @@ function checkBoard(data) {
             case 4:
                 if (turn != order) {
                     const reply = readline.question(`Do you accept to double (Y/N, default N): `);
-                    if (reply[0] == "Y" || reply[0] == "y") {
+                    if (reply[0] === "Y" || reply[0] === "y") {
                         const accept = new solana.TransactionInstruction({
                             programId: program_id,
                             keys: [
@@ -353,10 +353,19 @@ function checkBoard(data) {
             case 3:
                 if (order === turn) {
                     let avail;
+                    let checkFirstMove = false;
+                    let move_len = 0;
+                    let possibility;
                     if (dice[0] === dice[1]) {
                         avail = [...dice, ...dice];
                     } else {
                         avail = [...dice];
+                        const maxMove = game_info.data[145];
+                        if (maxMove > 0) {
+                            checkFirstMove = true;
+                            move_len = game_info.data[146];
+                            possibility = game_info.data.slice(147, 147 + move_len * 2);
+                        }
                     }
                     const actions = Buffer.alloc(8);
                     let action_cnt = 0;
@@ -377,6 +386,22 @@ function checkBoard(data) {
                                     console.log("There is no such move");
                                     continue;
                                 }
+
+                                if (checkFirstMove) {
+                                    let found = false;
+                                    for (let i = 0; i < move_len; ++i) {
+                                        if ((possibility[2*i] === 0) && (possibility[2*i+1] === step)) {
+                                            found = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!found) {
+                                        console.log("You should not move this way");
+                                        continue;
+                                    }
+                                }
+                                checkFirstMove = false;
+
                                 avail.splice(i, 1);
                                 midBoard[0] -= 1;
                                 if (board[step-1] === 1) {
@@ -412,6 +437,22 @@ function checkBoard(data) {
                                     console.log("There is no such move");
                                     continue;
                                 }
+
+                                if (checkFirstMove) {
+                                    let found = false;
+                                    for (let i = 0; i < move_len; ++i) {
+                                        if ((possibility[2*i] === start) && (possibility[2*i+1] === step)) {
+                                            found = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!found) {
+                                        console.log("You should not move this way");
+                                        continue;
+                                    }
+                                }
+                                checkFirstMove = false;
+
                                 avail.splice(i, 1);
                                 board[start-1] += 1;
                                 if (start + step - 1 >= 24) {
@@ -442,6 +483,22 @@ function checkBoard(data) {
                                     console.log("There is no such move");
                                     continue;
                                 }
+
+                                if (checkFirstMove) {
+                                    let found = false;
+                                    for (let i = 0; i < move_len; ++i) {
+                                        if ((possibility[2*i] === 25) && (possibility[2*i+1] === step)) {
+                                            found = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!found) {
+                                        console.log("You should not move this way");
+                                        continue;
+                                    }
+                                }
+                                checkFirstMove = false;
+
                                 avail.splice(i, 1);
                                 midBoard[1] -= 1;
                                 if (board[24-step] === -1) {
@@ -472,6 +529,22 @@ function checkBoard(data) {
                                     console.log("You can not move here");
                                     continue;
                                 }
+
+                                if (checkFirstMove) {
+                                    let found = false;
+                                    for (let i = 0; i < move_len; ++i) {
+                                        if ((possibility[2*i] === start) && (possibility[2*i+1] === step)) {
+                                            found = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!found) {
+                                        console.log("You should not move this way");
+                                        continue;
+                                    }
+                                }
+                                checkFirstMove = false;
+
                                 let i = avail.indexOf(step);
                                 if (i === -1) {
                                     console.log("There is no such move");
