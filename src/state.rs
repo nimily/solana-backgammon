@@ -186,6 +186,7 @@ impl Game {
                     } else {
                         self.turn = Color::Black;
                     }
+                    self.calc_max_moves();
                 } else {
                     self.dice[0] = 0;
                     self.dice[1] = 0;
@@ -217,8 +218,14 @@ impl Game {
     }
 
     fn calc_max_moves_equal_dice(&mut self) {
-        self.max_moves = 4;
-        // let mut board = self.board.clone();
+        let die = self.dice[0];
+        let max_moves: u8 = 0;
+        let mut board = self.board.clone();
+        let bar_index = self.turn.get
+        while board.has_checker_on_bar(self.turn) {
+            if board.is_valid_move(self.turn, move_)
+        }
+
     }
 
     fn calc_max_moves_unequal_dice(&mut self) {
@@ -242,16 +249,8 @@ impl Board {
         Ok(self.points[idx].color == player.opponent()? && self.points[idx].n_pieces >= 2)
     }
 
-    pub fn get_bar_index(&self, player: Color) -> Result<usize, ProgramError> {
-        match player {
-            Color::White => Ok(0),
-            Color::Black => Ok(25),
-            Color::None => Err(BackgammonError::InvalidColor.into()),
-        }
-    }
-
     pub fn has_checker_on_bar(&self, player: Color) -> Result<bool, ProgramError> {
-        let bar_index = self.get_bar_index(player)?;
+        let bar_index = player.get_bar_index()?;
         Ok(self.points[bar_index].n_pieces > 0)
     }
 
@@ -314,8 +313,8 @@ impl Board {
     pub fn hit(&mut self, idx: u8) -> Result<(), ProgramError> {
         let idx = idx as usize;
         let color = self.points[idx].color;
-        self.points[self.get_bar_index(color)?].n_pieces += 1; // move the checker to the bar
-        self.points[self.get_bar_index(color)?].color = color;
+        self.points[color.get_bar_index()?].n_pieces += 1; // move the checker to the bar
+        self.points[color.get_bar_index()?].color = color;
         self.points[idx].n_pieces = 0;
         self.points[idx].color = Color::None;
         Ok(())
@@ -462,6 +461,14 @@ impl Color {
             Color::None => return "None",
             Color::White => return "White",
             Color::Black => return "Black",
+        }
+    }
+
+    pub fn get_bar_index(&self) -> Result<usize, ProgramError> {
+        match self {
+            Color::White => Ok(0),
+            Color::Black => Ok(25),
+            Color::None => Err(BackgammonError::InvalidColor.into()),
         }
     }
 }
