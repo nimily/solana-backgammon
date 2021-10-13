@@ -41,9 +41,63 @@ impl Game {
         }
     }
 
-    pub fn has_checker_in_middle(&self, color: Color) -> bool {
-        let index = Color::middle_point_index(color);
-        self.board.points[index].n_pieces > 0
+    pub fn can_double(&mut self, color: Color) -> bool {
+        if self.state != GameState::DoubleOrRoll {
+            msg!("State is not DoubleOrRoll (state = {})", self.state);
+            return false;
+        }
+        if self.turn != color {
+            msg!("It's not {}'s turn", color.to_string());
+            return false;
+        }
+        if self.last_doubled == color {
+            msg!("{} doubled last and cannot double", color.to_string());
+            return false;
+        }
+        if self.multiplier == 64 {
+            msg!("Maximum multiplier 64 has reached");
+            return false;
+        }
+        true
+    }
+
+    pub fn request_double(&mut self, color: Color) -> Result<(), ProgramError> {
+        if self.can_double(color) == false {
+            return Err(BackgammonError::InvalidState.into());
+        }
+
+        self.state = GameState::Doubled;
+        Ok(())
+    }
+
+    pub fn roll_dice(&mut self, color: Color, rng: &dyn Fn(u8) -> u8) -> Result<(), ProgramError> {
+        if self.state == GameState::Started {
+            let idx = color.index()?;
+            if self.dice[idx] != 0 {
+                return Err(BackgammonError::InvalidState.into());
+            }
+            self.dice[idx] = rng(0);
+            if self.dice[0] != 0 && self.dice[1] != 0 {
+                self.state = GameState::Rolled;
+                if self.dice[0] > self.dice[1] {
+                    self.turn = Color::White;
+                } else if self.dice[0] < self.dice[1] {
+                    self.turn = Color::Black;
+                } else {
+                    self.dice[0] = 0;
+                    self.dice[0] = 0;
+                }
+            }
+        } else {
+            if color != self.turn {
+                return Err(BackgammonError::UnauthorizedAction.into());
+            }
+            self.dice[0] = rng(0);
+            self.dice[1] = rng(1);
+            self.state = GameState::Rolled;
+            self.calc_max_moves();
+        }
+        Ok(())
     }
 }
 
@@ -136,6 +190,7 @@ impl Board {
         let idx = idx as usize;
         let color = self.points[idx].color;
         self.points[self.get_bar_index(color)?].n_pieces += 1; // move the checker to the bar
+        self.points[self.get_bar_index(color)?].color = color;
         self.points[idx].n_pieces = 0;
         self.points[idx].color = Color::None;
         Ok(())

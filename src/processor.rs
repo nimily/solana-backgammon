@@ -174,8 +174,7 @@ impl Processor {
             game.state = GameState::Rolled;
             game.calc_max_moves();
         }
-        Game::incr_and_pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
-        Ok(())
+        Game::incr_and_pack(game, &mut &mut game_info.data.borrow_mut()[..])
     }
 
     fn process_request_double(accounts: &[AccountInfo], _program_id: &Pubkey) -> ProgramResult {
@@ -189,18 +188,9 @@ impl Processor {
 
         msg!("Unpacking game account");
         let mut game = Game::unpack_unchecked(&game_info.data.borrow())?;
-        if game.state != GameState::DoubleOrRoll {
-            return Err(BackgammonError::InvalidState.into());
-        }
-
-        let player_color = game.get_color(player_info.key);
-        if player_color != game.turn {
-            return Err(BackgammonError::UnauthorizedAction.into());
-        }
-
-        game.state = GameState::Doubled;
-        Game::incr_and_pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
-        Ok(())
+        let color = game.get_color(player_info.key);
+        game.request_double(color)?;
+        Game::incr_and_pack(game, &mut &mut game_info.data.borrow_mut()[..])
     }
 
     fn process_respond_to_double(
@@ -229,16 +219,15 @@ impl Processor {
         }
 
         if accept {
-            game.winner = game.turn;
-            game.state = GameState::Finished;
-        } else {
             game.multiplier *= 2;
             game.last_doubled = game.turn;
             game.dice[0] = roll_die(program_id, &game, 0);
             game.dice[1] = roll_die(program_id, &game, 1);
             game.state = GameState::Rolled;
-            game.turn = game.turn.opponent()?;
             game.calc_max_moves();
+        } else {
+            game.winner = game.turn;
+            game.state = GameState::Finished;
         }
         Game::incr_and_pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
         Ok(())
@@ -321,6 +310,25 @@ impl Processor {
         Ok(())
     }
 }
+
+// fn random_gen(program_id: Pubkey, game: &Game, seed: u8) -> impl Fn(u8) -> u8 {
+//     move |seed: u8| -> u8 {
+//         // 5
+//         let seeds = &[
+//             game.white_pubkey.as_ref(),
+//             game.black_pubkey.as_ref(),
+//             &game.counter.to_le_bytes(),
+//             &[seed],
+//         ];
+//         // let (address, _bump) = Pubkey::find_program_address(seeds, &program_id);
+//         let address = Pubkey::new([0]);
+//         let mut total: i64 = 0;
+//         for i in 0..32 {
+//             total += (address.as_ref()[i] as i64) * 256_i64.pow((i % 4) as u32);
+//         }
+//         ((total % 6) + 1) as u8
+//     }
+// }
 
 fn roll_die(program_id: &Pubkey, game: &Game, seed: u8) -> u8 {
     let seeds = &[
