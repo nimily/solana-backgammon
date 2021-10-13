@@ -13,7 +13,10 @@ pub enum BackgammonInstruction {
     /// 2. `[writable]` game
     /// 3. `[]` system_program
     /// 4. `[]` sysvar_rent_program
-    InitGame { game_id: u64 },
+    InitGame {
+        #[allow(dead_code)]
+        game_id: u64,
+    },
 
     ///
     ///
@@ -40,7 +43,10 @@ pub enum BackgammonInstruction {
     ///
     /// 0. `[signer]` player
     /// 1. `[writable]` game
-    RespondToDouble { accept: bool },
+    RespondToDouble {
+        #[allow(dead_code)]
+        accept: bool,
+    },
 
     ///
     ///
@@ -49,5 +55,8 @@ pub enum BackgammonInstruction {
     ///
     /// 0. `[signer]` player
     /// 1. `[writable]` game
-    ApplyMoves { moves: [Move; 4] },
+    ApplyMoves {
+        #[allow(dead_code)]
+        moves: [Move; 4],
+    },
 }
