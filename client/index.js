@@ -53,6 +53,7 @@ async function retry(transaction, player) {
             if (error.message.includes("FetchError")) {
                 connection1 = new solana.Connection(rpcUrl, 'confirmed');
                 await retry(transaction, player);
+                console.log("reconnecting");
             } else {
                 throw error;
             }
@@ -65,6 +66,7 @@ async function retry(transaction, player) {
             if (error.message.includes("FetchError")) {
                 connection2 = new solana.Connection(rpcUrl, 'confirmed');
                 await retry(transaction, player);
+                console.log("reconnecting");
             } else {
                 throw error;
             }
@@ -82,6 +84,7 @@ async function getInfo(account, player) {
             if (error.message.includes("FetchError")) {
                 connection1 = new solana.Connection(rpcUrl, 'confirmed');
                 info = await getInfo(account, player);
+                console.log("reconnecting");
             } else {
                 throw error;
             }
@@ -94,6 +97,7 @@ async function getInfo(account, player) {
             if (error.message.includes("FetchError")) {
                 connection2 = new solana.Connection(rpcUrl, 'confirmed');
                 info = await getInfo(account, player);
+                console.log("reconnecting");
             } else {
                 throw error;
             }
