@@ -62,7 +62,7 @@ async function retry(transaction) {
         await solana.sendAndConfirmTransaction(connection, transaction, [myself]);
     } catch (error) {
         console.log(error.message);
-        if (error.message.includes("socket hang up")) {
+        if (error.message.includes("socket hang up") || error.message.includes("FetchError")) {
             connection = new solana.Connection(rpcUrl, 'confirmed');
             await retry(transaction);
             console.log("reconnecting");
@@ -78,7 +78,7 @@ async function getInfo(account) {
         info = await connection.getAccountInfo(account);
     } catch (error) {
         console.log(error.message);
-        if (error.message.includes("socket hang up")) {
+        if (error.message.includes("socket hang up") || error.message.includes("FetchError")) {
             connection = new solana.Connection(rpcUrl, 'confirmed');
             info = await getInfo(account, myself);
             console.log("reconnecting");
@@ -93,9 +93,9 @@ async function getInfo(account) {
 function display() {
     console.log("=".repeat(100));
     console.log("=".repeat(100));
-    const top = 13 + "\t" + 14 + "\t" + 15 + "\t" + 16 + "\t" + 17 + "\t" + 18 + "\t" + "mid" + "\t" + 19 + "\t" + 20 + "\t" + 21 + "\t" + 22 + "\t" + 23 + "\t" + 24 + "\t" + "right" + "\t" + "\t" + "die";
+    const top = 13 + "\t" + 14 + "\t" + 15 + "\t" + 16 + "\t" + 17 + "\t" + 18 + "  |   " + 19 + "\t" + 20 + "\t" + 21 + "\t" + 22 + "\t" + 23 + "\t" + 24 + "\t" + "right" + "\t" + "\t" + "die";
     console.log(top);
-    console.log();
+    console.log(" ".repeat(44) + "|");
     const sb = board.map(x => (x <= 0 ? "" : "\x1b[32m+") + x + "\x1b[0m").map(x => (x[0] === "-" ? "\x1b[31m" : "") + x);
     const sm = [...midBoard];
     sm[0] = (sm[0] != 0 ? "\x1b[31m-" + sm[0] + "\x1b[0m" : 0);
@@ -103,17 +103,19 @@ function display() {
     const sr = [...rightBoard];
     sr[0] = (sr[0] != 0 ? "\x1b[31m-" + sr[0] + "\x1b[0m" : 0);
     sr[1] = (sr[1] != 0 ? "\x1b[32m+" + sr[1] + "\x1b[0m" : 0);
-    const top1 = sb[12] + "\t" + sb[13] + "\t" + sb[14] + "\t" + sb[15] + "\t" + sb[16] + "\t" + sb[17] + "\t" + sm[0] + "\t" + sb[18] + "\t" + sb[19] + "\t" + sb[20] + "\t" + sb[21] + "\t" + sb[22] + "\t" + sb[23] + "\t" + sr[0] + "\t" + "\t" + dice[0];
+    let prev = (board[17] > 0 ? 1 : 0) + ("" + board[17]).length;
+    const top1 = sb[12] + "\t" + sb[13] + "\t" + sb[14] + "\t" + sb[15] + "\t" + sb[16] + "\t" + sb[17] + " ".repeat(4-prev) + sm[0] + "   " + sb[18] + "\t" + sb[19] + "\t" + sb[20] + "\t" + sb[21] + "\t" + sb[22] + "\t" + sb[23] + "\t" + sr[0] + "\t" + "\t" + dice[0];
     console.log(top1);
-    console.log();
-    console.log();
+    console.log(" ".repeat(44) + "|");
+    console.log(" ".repeat(44) + "|");
     console.log("-".repeat(100) + "\t" + "multiplier: " + multiplier);
-    console.log();
-    console.log();
-    const bot1 = sb[11] + "\t" + sb[10] + "\t" + sb[9] + "\t" + sb[8] + "\t" + sb[7] + "\t" + sb[6] + "\t" + sm[1] + "\t" + sb[5] + "\t" + sb[4] + "\t" + sb[3] + "\t" + sb[2] + "\t" + sb[1] + "\t" + sb[0] + "\t" + sr[1] + "\t" + "\t" + dice[1];
+    console.log(" ".repeat(44) + "|");
+    console.log(" ".repeat(44) + "|");
+    prev = (board[6] > 0 ? 1 : 0) + ("" + board[17]).length;
+    const bot1 = sb[11] + "\t" + sb[10] + "\t" + sb[9] + "\t" + sb[8] + "\t" + sb[7] + "\t" + sb[6] + " ".repeat(4-prev) + sm[1] + "   " + sb[5] + "\t" + sb[4] + "\t" + sb[3] + "\t" + sb[2] + "\t" + sb[1] + "\t" + sb[0] + "\t" + sr[1] + "\t" + "\t" + dice[1];
     console.log(bot1);
-    console.log();
-    const bot = 12 + "\t" + 11 + "\t" + 10 + "\t" + 9 + "\t" + 8 + "\t" + 7 + "\t" + "mid" + "\t" + 6 + "\t" + 5 + "\t" + 4 + "\t" + 3 + "\t" + 2 + "\t" + 1 + "\t" + "right" + "\t" + "\t" + "die";
+    console.log(" ".repeat(44) + "|");
+    const bot = 12 + "\t" + 11 + "\t" + 10 + "\t" + 9 + "\t" + 8 + "\t" + 7 + "   |   " + 6 + "\t" + 5 + "\t" + 4 + "\t" + 3 + "\t" + 2 + "\t" + 1 + "\t" + "right" + "\t" + "\t" + "die";
     console.log(bot);
     console.log("=".repeat(100));
     console.log("=".repeat(100));
@@ -184,24 +186,40 @@ function checkStart(start) {
 }
 
 function checkBoard(data) {
+    let changed = false;
     const info = data.slice(87, 141);
     if ((info[52] != rightBoard[0]) || (info[53] != rightBoard[1])) {
-        console.log("right board does not match", info[52], info[53]);
+        console.log("right board changed:", info[52], info[53]);
         rightBoard[0] = info[52];
         rightBoard[1] = info[53];
+        changed = true;
     }
     if ((info[1] != midBoard[0]) || (info[51] != midBoard[1])) {
-        console.log("mid board does not match", info[1], info[51]);
+        console.log("mid board changed:", info[1], info[51]);
         midBoard[0] = info[1];
         midBoard[1] = info[51];
+        changed = true;
     }
     for (let i = 0; i < 24; ++i) {
         const actual = (info[2+i*2] * 2 - 3) * info[3+i*2];
         if (actual != board[i]) {
-            console.log("board does not match", i, actual);
+            console.log("board changed:", i, actual);
             board[i] = actual;
+            changed = true;
         }
     }
+    if ((dice[0] != data[75]) || (dice[1] != data[76])) {
+        console.log("dice changed:", data[75], data[76]);
+        dice[0] = data[75];
+        dice[1] = data[76];
+        changed = true;
+    }
+    if (multiplier != data[77]) {
+        console.log("multiplier changed:", data[77]);
+        multiplier = data[77];
+        changed = true;
+    }
+    return changed;
 }
 
 (async () => {
@@ -255,10 +273,10 @@ function checkBoard(data) {
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
                 game_info = await getInfo(game);
-                dice[0] = game_info.data[75];
-                dice[1] = game_info.data[76];
+                if (checkBoard(game_info.data)) {
+                    display();
+                }
                 turn = game_info.data[73] - 1;
-                display();
                 status = game_info.data[8];
                 break;
             case 2:
@@ -292,9 +310,9 @@ function checkBoard(data) {
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
                 game_info = await getInfo(game);
-                dice[0] = game_info.data[75];
-                dice[1] = game_info.data[76];
-                display();
+                if (checkBoard(game_info.data)) {
+                    display();
+                }
                 status = game_info.data[8];
                 break;
             case 4:
@@ -327,10 +345,9 @@ function checkBoard(data) {
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
                 game_info = await getInfo(game);
-                multiplier = game_info.data[77];
-                dice[0] = game_info.data[75];
-                dice[1] = game_info.data[76];
-                display();
+                if (checkBoard(game_info.data)) {
+                    display();
+                }
                 status = game_info.data[8];
                 break;
             case 3:
@@ -491,10 +508,9 @@ function checkBoard(data) {
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
                 game_info = await getInfo(game);
-                dice[0] = game_info.data[75];
-                dice[1] = game_info.data[76];
-                checkBoard(game_info.data);
-                display();
+                if (checkBoard(game_info.data)) {
+                    display();
+                }
                 status = game_info.data[8];
                 turn = game_info.data[73] - 1;
                 break;
