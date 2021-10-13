@@ -327,7 +327,7 @@ function checkBoard(data) {
                             {pubkey: player.publicKey, isSigner: false, isWritable: false},
                             {pubkey: game, isSigner: false, isWritable: true},
                         ],
-                        data: buffer.Buffer.from([3, 0])
+                        data: buffer.Buffer.from([3, 1])
                     });
                     await retry(new solana.Transaction().add(accept), -turn);
                     console.log(`player ${-turn} accepts`);
@@ -338,7 +338,7 @@ function checkBoard(data) {
                             {pubkey: player.publicKey, isSigner: false, isWritable: false},
                             {pubkey: game, isSigner: false, isWritable: true},
                         ],
-                        data: buffer.Buffer.from([3, 1])
+                        data: buffer.Buffer.from([3, 0])
                     });
                     await retry(new solana.Transaction().add(accept), -turn);
                     console.log(`player ${-turn} surrenders`);
