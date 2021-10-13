@@ -1,7 +1,7 @@
 const readline = require('readline-sync'); 
 const solana = require('@solana/web3.js');
 const buffer = require('buffer');
-const crypto = require("crypto");
+const crypt = require("crypto");
 
 const rpcUrl = "https://api.devnet.solana.com";
 let connection1 = new solana.Connection(rpcUrl, 'confirmed');
@@ -13,7 +13,7 @@ let rightBoard = [0, 0];
 let dice = [0, 0];
 let multiplier = 1;
 
-const game_id = crypto.randomBytes(8);
+const game_id = crypt.randomBytes(8);
 console.log("game id", game_id);
 
 const program_id = new solana.PublicKey("Aqqg8L83rjkNfhLzAeZ4Aq37TBZyXnvLPWRTMruTWmJ8");
@@ -36,7 +36,7 @@ console.log("system program id", system.toBase58());
 const rent = solana.SYSVAR_RENT_PUBKEY;
 console.log("rent program id", rent.toBase58());
 
-function getKeypair(player) {
+function getKeypair(player : string) {
     if (player != "") {
         return solana.Keypair.fromSecretKey(JSON.parse(player));
     } else {
@@ -44,10 +44,10 @@ function getKeypair(player) {
     }
 }
 
-async function retry(transaction, player) {
+async function retry(transaction, player : number) {
     if (player === -1) {
         try {
-            await solana.sendAndConfirmTransaction(connection1, transaction,[player1]);
+            await solana.sendAndConfirmTransaction(connection1, transaction, [player1]);
         } catch (error) {
             if (error.message.includes("FetchError")) {
                 console.log("reconnecting");
@@ -60,7 +60,7 @@ async function retry(transaction, player) {
     } else {
         if (player === 1) {
             try {
-                await solana.sendAndConfirmTransaction(connection2, transaction,[player2]);
+                await solana.sendAndConfirmTransaction(connection2, transaction, [player2]);
             } catch (error) {
                 if (error.message.includes("FetchError")) {
                     console.log("reconnecting");
@@ -74,7 +74,7 @@ async function retry(transaction, player) {
     }
 }
 
-async function getInfo(account, player) {
+async function getInfo(account, player : number) {
     let info;
     if (player === -1) {
         try {
@@ -132,7 +132,7 @@ function display() {
     console.log("=".repeat(100));
 };
 
-function checkMove(player, steps) {
+function checkMove(player : number, steps : Array<number>) {
     if (player === -1) {
         if (midBoard[0] > 0) {
             for (const step of steps) {
@@ -180,7 +180,7 @@ function checkMove(player, steps) {
     }
 }
 
-function checkStep(step) {
+function checkStep(step : number) {
     if (step <= 6 && step >= 1) {
         return true;
     }
@@ -188,7 +188,7 @@ function checkStep(step) {
     return false;
 }
 
-function checkStart(start) {
+function checkStart(start : number) {
     if (start <= 24 || start >= 1) {
         return true;
     }
@@ -196,7 +196,7 @@ function checkStart(start) {
     return false;
 }
 
-async function checkBoard(data) {
+async function checkBoard(data : Array<number>) {
     const info = data.slice(87, 141);
     if ((info[52] != rightBoard[0]) || (info[53] != rightBoard[1])) {
         console.log("right board does not match", info[52], info[53]);
@@ -280,93 +280,10 @@ async function checkBoard(data) {
         console.log(`player ${turn} is first`);
     }
 
+    let doubleRoll = false;
     while ((rightBoard[0] < 15) && (rightBoard[1] < 15)) {
-
+        
         display();
-        let game_info = await getInfo(game, turn);
-        doubleRoll = (game_info.data[8] === 2);
-        if ((turn === -1) && doubleRoll) {
-            let game_info = await getInfo(game, -1);
-            const request = readline.question(`Do player -1 want to double (Y/N, default N): `);
-            if (request[0] == "Y" || request[0] == "y") {
-                const double = new solana.TransactionInstruction({
-                    programId: program_id,
-                    keys: [
-                        {pubkey: player1.publicKey, isSigner: false, isWritable: false},
-                        {pubkey: game, isSigner: false, isWritable: true},
-                    ],
-                    data: buffer.Buffer.from([2])
-                });
-                await retry(new solana.Transaction().add(double), -1);
-                console.log("player -1 wants to double");
-                const reply = readline.question(`Do player 1 accept to double (Y/N, default N): `);
-                if (reply[0] == "Y" || reply[0] == "y") {
-                    const accept = new solana.TransactionInstruction({
-                        programId: program_id,
-                        keys: [
-                            {pubkey: player2.publicKey, isSigner: false, isWritable: false},
-                            {pubkey: game, isSigner: false, isWritable: true},
-                        ],
-                        data: buffer.Buffer.from([3, 1])
-                    });
-                    await retry(new solana.Transaction().add(accept), 1);
-                    console.log("player 1 accepts");
-                    let game_info = await getInfo(game, -1);
-                    multiplier = game_info.data[77];
-                } else {
-                    const accept = new solana.TransactionInstruction({
-                        programId: program_id,
-                        keys: [
-                            {pubkey: player2.publicKey, isSigner: false, isWritable: false},
-                            {pubkey: game, isSigner: false, isWritable: true},
-                        ],
-                        data: buffer.Buffer.from([3, 0])
-                    });
-                    await retry(new solana.Transaction().add(accept), 1);
-                    console.log("player 1 refuses");
-                }
-            }
-        } else if ((turn === -1) && doubleRoll) {
-            const request = readline.question(`Do player 1 want to double (Y/N, default N): `);
-            if (request[0] == "Y" || request[0] == "y") {
-                const double = new solana.TransactionInstruction({
-                    programId: program_id,
-                    keys: [
-                        {pubkey: player2.publicKey, isSigner: false, isWritable: false},
-                        {pubkey: game, isSigner: false, isWritable: true},
-                    ],
-                    data: buffer.Buffer.from([2])
-                });
-                await retry(new solana.Transaction().add(double), 1);
-                console.log("player 1 wants to double");
-                const reply = readline.question(`Do player -1 accept to double (Y/N, default N): `);
-                if (reply[0] == "Y" || reply[0] == "y") {
-                    const accept = new solana.TransactionInstruction({
-                        programId: program_id,
-                        keys: [
-                            {pubkey: player1.publicKey, isSigner: false, isWritable: false},
-                            {pubkey: game, isSigner: false, isWritable: true},
-                        ],
-                        data: buffer.Buffer.from([3, 1])
-                    });
-                    await retry(new solana.Transaction().add(accept), -1);
-                    console.log("player -1 accepts");
-                    let game_info = await getInfo(game, 1);
-                    multiplier = game_info.data[77];
-                } else {
-                    const accept = new solana.TransactionInstruction({
-                        programId: program_id,
-                        keys: [
-                            {pubkey: player1.publicKey, isSigner: false, isWritable: false},
-                            {pubkey: game, isSigner: false, isWritable: true},
-                        ],
-                        data: buffer.Buffer.from([3, 0])
-                    });
-                    await retry(new solana.Transaction().add(accept), -1);
-                    console.log("player -1 refuses");
-                }
-            }
-        } 
         
         let avail;
         if (dice[0] === dice[1]) {
@@ -516,8 +433,7 @@ async function checkBoard(data) {
             });
             await retry(new solana.Transaction().add(move), -1);
             console.log("saving moves");
-            let game_info = await getInfo(game, -1);
-            checkBoard(game_info.data);
+            
         } else {
             const move = new solana.TransactionInstruction({
                 programId: program_id,
@@ -530,13 +446,96 @@ async function checkBoard(data) {
             });
             await retry(new solana.Transaction().add(move), 1);
             console.log("saving moves");
-            let game_info = await getInfo(game, 1);
-            checkBoard(game_info.data);
+        }
+        let game_info = await getInfo(game, turn);
+        checkBoard(game_info.data);
+        turn = game_info.data[73] * 2 - 3;
+        doubleRoll = (game_info.data[8] === 2);
+
+        if ((turn === -1) && doubleRoll) {
+            const request = readline.question(`Do player -1 want to double (Y/N, default N): `);
+            if (request[0] == "Y" || request[0] == "y") {
+                const double = new solana.TransactionInstruction({
+                    programId: program_id,
+                    keys: [
+                        {pubkey: player1.publicKey, isSigner: false, isWritable: false},
+                        {pubkey: game, isSigner: false, isWritable: true},
+                    ],
+                    data: buffer.Buffer.from([2])
+                });
+                await retry(new solana.Transaction().add(double), -1);
+                console.log("player -1 wants to double");
+                const reply = readline.question(`Do player 1 accept to double (Y/N, default N): `);
+                if (reply[0] == "Y" || reply[0] == "y") {
+                    const accept = new solana.TransactionInstruction({
+                        programId: program_id,
+                        keys: [
+                            {pubkey: player2.publicKey, isSigner: false, isWritable: false},
+                            {pubkey: game, isSigner: false, isWritable: true},
+                        ],
+                        data: buffer.Buffer.from([3, 1])
+                    });
+                    await retry(new solana.Transaction().add(accept), 1);
+                    console.log("player 1 accepts");
+                    let game_info = await getInfo(game, -1);
+                    multiplier = game_info.data[77];
+                    display();
+                } else {
+                    const accept = new solana.TransactionInstruction({
+                        programId: program_id,
+                        keys: [
+                            {pubkey: player2.publicKey, isSigner: false, isWritable: false},
+                            {pubkey: game, isSigner: false, isWritable: true},
+                        ],
+                        data: buffer.Buffer.from([3, 0])
+                    });
+                    await retry(new solana.Transaction().add(accept), 1);
+                    console.log("player 1 refuses");
+                }
+            }
+        } else if ((turn === 1) && doubleRoll) {
+            const request = readline.question(`Do player 1 want to double (Y/N, default N): `);
+            if (request[0] == "Y" || request[0] == "y") {
+                const double = new solana.TransactionInstruction({
+                    programId: program_id,
+                    keys: [
+                        {pubkey: player2.publicKey, isSigner: false, isWritable: false},
+                        {pubkey: game, isSigner: false, isWritable: true},
+                    ],
+                    data: buffer.Buffer.from([2])
+                });
+                await retry(new solana.Transaction().add(double), 1);
+                console.log("player 1 wants to double");
+                const reply = readline.question(`Do player -1 accept to double (Y/N, default N): `);
+                if (reply[0] == "Y" || reply[0] == "y") {
+                    const accept = new solana.TransactionInstruction({
+                        programId: program_id,
+                        keys: [
+                            {pubkey: player1.publicKey, isSigner: false, isWritable: false},
+                            {pubkey: game, isSigner: false, isWritable: true},
+                        ],
+                        data: buffer.Buffer.from([3, 1])
+                    });
+                    await retry(new solana.Transaction().add(accept), -1);
+                    console.log("player -1 accepts");
+                    let game_info = await getInfo(game, 1);
+                    multiplier = game_info.data[77];
+                    display();
+                } else {
+                    const accept = new solana.TransactionInstruction({
+                        programId: program_id,
+                        keys: [
+                            {pubkey: player1.publicKey, isSigner: false, isWritable: false},
+                            {pubkey: game, isSigner: false, isWritable: true},
+                        ],
+                        data: buffer.Buffer.from([3, 0])
+                    });
+                    await retry(new solana.Transaction().add(accept), -1);
+                    console.log("player -1 refuses");
+                }
+            }
         }
 
-        turn = -turn;
-        game_info = await getInfo(game, turn);
-        turn = game_info.data[73] * 2 - 3;
         if (turn === -1) {
             let roll = new solana.TransactionInstruction({
                 programId: program_id,

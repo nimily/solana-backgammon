@@ -4,7 +4,7 @@
   "description": "solana backgammon game",
   "main": "index.js",
   "scripts": {
-    "test": "npx ts-node client/index.js"
+    "test": "npx ts-node client/index.ts"
   },
   "repository": {
     "type": "git",
