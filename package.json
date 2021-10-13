@@ -4,7 +4,8 @@
   "description": "solana backgammon game",
   "main": "index.js",
   "scripts": {
-    "test": "npx ts-node client/index.js"
+    "run": "npx ts-node client/index.js",
+    "test": "npx ts-node client/client.js"
   },
   "repository": {
     "type": "git",
@@ -22,6 +23,7 @@
   "homepage": "https://github.com/nimily/solana-backgammon#readme",
   "dependencies": {
     "@solana/web3.js": "^1.29.2",
+    "bs58": "^4.0.1",
     "buffer": "^6.0.3",
     "crypto": "^1.0.1",
     "readline-sync": "^1.4.10"
