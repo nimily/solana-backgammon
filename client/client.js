@@ -108,8 +108,12 @@ function display() {
     console.log(top);
     console.log();
     const sb = board.map(x => (x <= 0 ? "" : "\x1b[32m+") + x + "\x1b[0m").map(x => (x[0] === "-" ? "\x1b[31m" : "") + x);
-    const sm = ["\x1b[31m-" + midBoard[0] + "\x1b[0m", "\x1b[32m+" + midBoard[1] + "\x1b[0m"];
-    const sr = ["\x1b[31m-" + rightBoard[0] + "\x1b[0m", "\x1b[32m+" + rightBoard[1] + "\x1b[0m"];
+    const sm = [...midBoard];
+    sm[0] = (sm[0] != 0 ? "\x1b[31m-" + sm[0] + "\x1b[0m" : 0);
+    sm[1] = (sm[1] != 0 ? "\x1b[32m+" + sm[1] + "\x1b[0m" : 0);
+    const sr = [...rightBoard];
+    sr[0] = (sr[0] != 0 ? "\x1b[31m-" + sr[0] + "\x1b[0m" : 0);
+    sr[1] = (sr[1] != 0 ? "\x1b[32m+" + sr[1] + "\x1b[0m" : 0);
     const top1 = sb[12] + "\t" + sb[13] + "\t" + sb[14] + "\t" + sb[15] + "\t" + sb[16] + "\t" + sb[17] + "\t" + sm[0] + "\t" + sb[18] + "\t" + sb[19] + "\t" + sb[20] + "\t" + sb[21] + "\t" + sb[22] + "\t" + sb[23] + "\t" + sr[0] + "\t" + "\t" + dice[0];
     console.log(top1);
     console.log();
