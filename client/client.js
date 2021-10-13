@@ -105,7 +105,7 @@ function display() {
     const sr = [...rightBoard];
     sr[0] = (sr[0] != 0 ? "\x1b[31m-" + sr[0] + "\x1b[0m" : 0);
     sr[1] = (sr[1] != 0 ? "\x1b[32m+" + sr[1] + "\x1b[0m" : 0);
-    let prev = (board[17] > 0 ? 1 : 0) + ("" + board[17]).length;
+    let prev = (board[17] > 0 ? 1 : 0) + board[17].toString().length;
     const top1 = sb[12] + "\t" + sb[13] + "\t" + sb[14] + "\t" + sb[15] + "\t" + sb[16] + "\t" + sb[17] + " ".repeat(4-prev) + sm[0] + "   " + sb[18] + "\t" + sb[19] + "\t" + sb[20] + "\t" + sb[21] + "\t" + sb[22] + "\t" + sb[23] + "\t" + sr[0] + "\t" + "\t" + dice[0];
     console.log(top1);
     console.log(" ".repeat(44) + "|");
@@ -113,7 +113,7 @@ function display() {
     console.log("-".repeat(100) + "\t" + "multiplier: " + multiplier);
     console.log(" ".repeat(44) + "|");
     console.log(" ".repeat(44) + "|");
-    prev = (board[6] > 0 ? 1 : 0) + ("" + board[17]).length;
+    prev = (board[6] > 0 ? 1 : 0) + board[6].toString().length;
     const bot1 = sb[11] + "\t" + sb[10] + "\t" + sb[9] + "\t" + sb[8] + "\t" + sb[7] + "\t" + sb[6] + " ".repeat(4-prev) + sm[1] + "   " + sb[5] + "\t" + sb[4] + "\t" + sb[3] + "\t" + sb[2] + "\t" + sb[1] + "\t" + sb[0] + "\t" + sr[1] + "\t" + "\t" + dice[1];
     console.log(bot1);
     console.log(" ".repeat(44) + "|");
@@ -305,7 +305,7 @@ function checkBoard(data) {
                             data: buffer.Buffer.from([1])
                             
                         });
-                        console.log(await retry(new solana.Transaction().add(roll)));
+                        await retry(new solana.Transaction().add(roll));
                         console.log(`you rolled dices`);
                     }
                 } else {
