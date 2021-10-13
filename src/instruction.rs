@@ -22,7 +22,7 @@ pub enum BackgammonInstruction {
     ///
     /// 0. `[signer]` player
     /// 1. `[writable]` game
-    Roll {},
+    SkipDouble {},
 
     ///
     ///

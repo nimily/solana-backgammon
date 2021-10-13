@@ -41,17 +41,17 @@ impl Game {
         }
     }
 
-    pub fn can_double(&mut self, color: Color) -> bool {
+    pub fn can_double(&mut self, player: Color) -> bool {
         if self.state != GameState::DoubleOrRoll {
             msg!("State is not DoubleOrRoll (state = {})", self.state);
             return false;
         }
-        if self.turn != color {
-            msg!("It's not {}'s turn", color.to_string());
+        if self.turn != player {
+            msg!("It's not {}'s turn", player.to_string());
             return false;
         }
-        if self.last_doubled == color {
-            msg!("{} doubled last and cannot double", color.to_string());
+        if self.last_doubled == player {
+            msg!("{} doubled last and cannot double", player.to_string());
             return false;
         }
         if self.multiplier == 64 {
@@ -61,8 +61,24 @@ impl Game {
         true
     }
 
-    pub fn request_double(&mut self, color: Color) -> Result<(), ProgramError> {
-        if self.can_double(color) == false {
+    pub fn skip_double(
+        &mut self,
+        player: Color,
+        rdc: &mut dyn RandomDice,
+    ) -> Result<(), ProgramError> {
+        if self.state != GameState::Started && self.state != GameState::DoubleOrRoll {
+            msg!(
+                "Rolling is only possible when Started or DoubleOrRoll (state = {})",
+                self.state
+            );
+            return Err(BackgammonError::InvalidState.into());
+        }
+
+        self.roll_dice(player, rdc)
+    }
+
+    pub fn request_double(&mut self, player: Color) -> Result<(), ProgramError> {
+        if self.can_double(player) == false {
             return Err(BackgammonError::InvalidState.into());
         }
 
@@ -70,34 +86,143 @@ impl Game {
         Ok(())
     }
 
-    pub fn roll_dice(&mut self, color: Color, rng: &dyn Fn(u8) -> u8) -> Result<(), ProgramError> {
+    pub fn respond_to_double(
+        &mut self,
+        player: Color,
+        accept: bool,
+        rdc: &mut dyn RandomDice,
+    ) -> Result<(), ProgramError> {
+        if self.state != GameState::Doubled {
+            msg!("The opponent has not responded to the double yet.");
+            return Err(BackgammonError::InvalidState.into());
+        }
+
+        if player != self.turn.opponent()? {
+            return Err(BackgammonError::UnauthorizedAction.into());
+        }
+
+        if accept {
+            self.multiplier *= 2;
+            self.last_doubled = self.turn;
+            self.roll_dice(player, rdc)?;
+        } else {
+            self.winner = self.turn;
+            self.state = GameState::Finished;
+        }
+        Ok(())
+    }
+
+    pub fn apply_moves(
+        &mut self,
+        player: Color,
+        moves: [Move; 4],
+        rdc: &mut dyn RandomDice,
+    ) -> Result<(), ProgramError> {
+        if self.state != GameState::Rolled {
+            msg!("The dice are not rolled yet");
+            return Err(BackgammonError::InvalidState.into());
+        }
+
+        if player != self.turn {
+            msg!("It's not {}'s turn", player.to_string());
+            return Err(BackgammonError::UnauthorizedAction.into());
+        }
+
+        let mut values = vec![self.dice[0], self.dice[1]];
+        if self.dice[0] == self.dice[1] {
+            values.push(self.dice[0]);
+            values.push(self.dice[0]);
+        }
+        for i in 0..4 {
+            msg!(
+                "applying move {} for {} steps",
+                moves[i].start,
+                moves[i].steps
+            );
+            if moves[i].steps == 0 {
+                // TODO check if this is desired.
+                msg!("Only {} moves were available", i);
+                break;
+            }
+            if values.contains(&moves[i].steps) == false {
+                msg!("You can not move a checker for {} steps", moves[i].steps);
+                return Err(BackgammonError::InvalidMove.into());
+            }
+
+            self.board.apply_move(self.turn, moves[i])?;
+
+            let index = values.iter().position(|x| *x == moves[i].steps).unwrap();
+            values.remove(index);
+        }
+        msg!("Moves applied, updating the state...");
+        self.last_moves = moves;
+        self.turn = self.turn.opponent()?;
+        if self.last_doubled == self.turn || self.multiplier == 64 {
+            self.roll_dice(self.turn, rdc)
+        } else {
+            self.dice[0] = 0;
+            self.dice[1] = 0;
+            self.state = GameState::DoubleOrRoll;
+            Ok(())
+        }
+    }
+
+    pub fn roll_dice(
+        &mut self,
+        player: Color,
+        rdc: &mut dyn RandomDice,
+    ) -> Result<(), ProgramError> {
         if self.state == GameState::Started {
-            let idx = color.index()?;
+            let idx = player.index()?;
             if self.dice[idx] != 0 {
                 return Err(BackgammonError::InvalidState.into());
             }
-            self.dice[idx] = rng(0);
+            self.dice[idx] = rdc.generate();
             if self.dice[0] != 0 && self.dice[1] != 0 {
-                self.state = GameState::Rolled;
-                if self.dice[0] > self.dice[1] {
-                    self.turn = Color::White;
-                } else if self.dice[0] < self.dice[1] {
-                    self.turn = Color::Black;
+                if self.dice[0] != self.dice[1] {
+                    self.state = GameState::Rolled;
+                    if self.dice[0] > self.dice[1] {
+                        self.turn = Color::White;
+                    } else {
+                        self.turn = Color::Black;
+                    }
                 } else {
                     self.dice[0] = 0;
-                    self.dice[0] = 0;
+                    self.dice[1] = 0;
                 }
             }
         } else {
-            if color != self.turn {
+            if player != self.turn {
                 return Err(BackgammonError::UnauthorizedAction.into());
             }
-            self.dice[0] = rng(0);
-            self.dice[1] = rng(1);
+            self.dice[0] = rdc.generate();
+            self.dice[1] = rdc.generate();
             self.state = GameState::Rolled;
             self.calc_max_moves();
         }
         Ok(())
+    }
+
+    pub fn incr_and_pack(mut self, dst: &mut [u8]) -> Result<(), ProgramError> {
+        self.counter += 1;
+        return Game::pack(self, dst);
+    }
+
+    pub fn calc_max_moves(&mut self) {
+        if self.dice[0] == self.dice[1] {
+            self.calc_max_moves_equal_dice();
+        } else {
+            self.calc_max_moves_unequal_dice();
+        }
+    }
+
+    fn calc_max_moves_equal_dice(&mut self) {
+        self.max_moves = 4;
+        // let mut board = self.board.clone();
+    }
+
+    fn calc_max_moves_unequal_dice(&mut self) {
+        self.max_moves = 2;
     }
 }
 
@@ -109,42 +234,42 @@ pub struct Board {
 }
 
 impl Board {
-    pub fn is_closed(&self, color: Color, idx: u8) -> Result<bool, ProgramError> {
+    pub fn is_closed(&self, player: Color, idx: u8) -> Result<bool, ProgramError> {
         let idx = idx as usize;
         if idx < 1 || idx > 24 {
             return Err(BackgammonError::InvalidPoint.into());
         }
-        Ok(self.points[idx].color == color.opponent()? && self.points[idx].n_pieces >= 2)
+        Ok(self.points[idx].color == player.opponent()? && self.points[idx].n_pieces >= 2)
     }
 
-    pub fn get_bar_index(&self, color: Color) -> Result<usize, ProgramError> {
-        match color {
+    pub fn get_bar_index(&self, player: Color) -> Result<usize, ProgramError> {
+        match player {
             Color::White => Ok(0),
             Color::Black => Ok(25),
             Color::None => Err(BackgammonError::InvalidColor.into()),
         }
     }
 
-    pub fn has_checker_on_bar(&self, color: Color) -> Result<bool, ProgramError> {
-        let bar_index = self.get_bar_index(color)?;
+    pub fn has_checker_on_bar(&self, player: Color) -> Result<bool, ProgramError> {
+        let bar_index = self.get_bar_index(player)?;
         Ok(self.points[bar_index].n_pieces > 0)
     }
 
-    pub fn is_valid_move(&self, color: Color, move_: Move) -> Result<(), ProgramError> {
-        if self.points[move_.start as usize].color != color {
-            msg!("{} cannot move the opponent's checkers", color.to_string());
+    pub fn is_valid_move(&self, player: Color, move_: Move) -> Result<(), ProgramError> {
+        if self.points[move_.start as usize].color != player {
+            msg!("{} cannot move the opponent's checkers", player.to_string());
             return Err(BackgammonError::InvalidMove.into());
         }
 
-        let distance = self.distance(color, move_.start)?;
-        if self.is_bear_off(color, move_)? {
-            let farthest = self.farthest(color)?;
+        let distance = self.distance(player, move_.start)?;
+        if self.is_bear_off(player, move_)? {
+            let farthest = self.farthest(player)?;
 
             if farthest > 6 {
                 // not all pieces are in home
                 msg!(
                     "{} can not bear off as has pieces in the outer board",
-                    color.to_string()
+                    player.to_string()
                 );
                 return Err(BackgammonError::InvalidMove.into());
             }
@@ -154,17 +279,17 @@ impl Board {
                 return Err(BackgammonError::InvalidMove.into());
             }
         } else {
-            let end = self.from_distance(color, distance - move_.steps)?;
-            if self.is_closed(color, end)? {
-                msg!("Point {} is closed for {}", end, color.to_string());
+            let end = self.from_distance(player, distance - move_.steps)?;
+            if self.is_closed(player, end)? {
+                msg!("Point {} is closed for {}", end, player.to_string());
                 return Err(BackgammonError::InvalidMove.into());
             }
         }
         Ok(())
     }
 
-    pub fn apply_move(&mut self, color: Color, move_: Move) -> Result<bool, ProgramError> {
-        self.is_valid_move(color, move_)?;
+    pub fn apply_move(&mut self, player: Color, move_: Move) -> Result<bool, ProgramError> {
+        self.is_valid_move(player, move_)?;
 
         let point = &mut self.points[move_.start as usize];
         point.n_pieces -= 1;
@@ -172,16 +297,16 @@ impl Board {
             point.color = Color::None;
         }
 
-        if self.is_bear_off(color, move_)? {
-            self.borne[color.index()?] += 1;
+        if self.is_bear_off(player, move_)? {
+            self.borne[player.index()?] += 1;
         } else {
-            let distance = self.distance(color, move_.start)?;
-            let end = self.from_distance(color, distance - move_.steps)?;
-            if self.points[end as usize].color == color.opponent()? {
+            let distance = self.distance(player, move_.start)?;
+            let end = self.from_distance(player, distance - move_.steps)?;
+            if self.points[end as usize].color == player.opponent()? {
                 self.hit(end)?;
             }
             self.points[end as usize].n_pieces += 1;
-            self.points[end as usize].color = color;
+            self.points[end as usize].color = player;
         }
         Ok(true)
     }
@@ -196,12 +321,12 @@ impl Board {
         Ok(())
     }
 
-    pub fn is_bear_off(&self, color: Color, move_: Move) -> Result<bool, ProgramError> {
-        Ok(self.distance(color, move_.start)? <= move_.steps)
+    pub fn is_bear_off(&self, player: Color, move_: Move) -> Result<bool, ProgramError> {
+        Ok(self.distance(player, move_.start)? <= move_.steps)
     }
 
-    pub fn farthest(&self, color: Color) -> Result<u8, ProgramError> {
-        match color {
+    pub fn farthest(&self, player: Color) -> Result<u8, ProgramError> {
+        match player {
             Color::White => {
                 for i in (0..25).rev() {
                     if self.points[24 - i].color == Color::White {
@@ -222,20 +347,41 @@ impl Board {
         }
     }
 
-    pub fn distance(&self, color: Color, idx: u8) -> Result<u8, ProgramError> {
-        match color {
+    pub fn distance(&self, player: Color, idx: u8) -> Result<u8, ProgramError> {
+        match player {
             Color::White => Ok(25 - idx),
             Color::Black => Ok(idx),
             Color::None => Err(BackgammonError::InvalidColor.into()),
         }
     }
 
-    pub fn from_distance(&self, color: Color, distance: u8) -> Result<u8, ProgramError> {
-        match color {
+    pub fn from_distance(&self, player: Color, distance: u8) -> Result<u8, ProgramError> {
+        match player {
             Color::White => Ok(25 - distance),
             Color::Black => Ok(distance),
             Color::None => Err(BackgammonError::InvalidColor.into()),
         }
+    }
+}
+
+impl IsInitialized for Game {
+    fn is_initialized(&self) -> bool {
+        self.state != GameState::Uninitialized
+    }
+}
+
+impl Sealed for Game {}
+
+impl Pack for Game {
+    const LEN: usize = 146; // FIXME
+    fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
+        let result = try_from_slice_unchecked::<Game>(src)?;
+        Ok(result)
+    }
+
+    fn pack_into_slice(&self, dst: &mut [u8]) {
+        let mut writer = dst;
+        self.serialize(&mut &mut writer).unwrap();
     }
 }
 
@@ -326,47 +472,6 @@ impl Default for Color {
     }
 }
 
-impl IsInitialized for Game {
-    fn is_initialized(&self) -> bool {
-        self.state != GameState::Uninitialized
-    }
-}
-
-impl Sealed for Game {}
-
-impl Pack for Game {
-    const LEN: usize = 146; // FIXME
-    fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
-        let result = try_from_slice_unchecked::<Game>(src)?;
-        Ok(result)
-    }
-
-    fn pack_into_slice(&self, dst: &mut [u8]) {
-        let mut writer = dst;
-        self.serialize(&mut &mut writer).unwrap();
-    }
-}
-
-impl Game {
-    pub fn incr_and_pack(mut self, dst: &mut [u8]) -> Result<(), ProgramError> {
-        self.counter += 1;
-        return Game::pack(self, dst);
-    }
-
-    pub fn calc_max_moves(&mut self) {
-        if self.dice[0] == self.dice[1] {
-            self.calc_max_moves_equal_dice();
-        } else {
-            self.calc_max_moves_unequal_dice();
-        }
-    }
-
-    fn calc_max_moves_equal_dice(&mut self) {
-        self.max_moves = 4;
-        // let mut board = self.board.clone();
-    }
-
-    fn calc_max_moves_unequal_dice(&mut self) {
-        self.max_moves = 2;
-    }
+pub trait RandomDice {
+    fn generate(&mut self) -> u8;
 }

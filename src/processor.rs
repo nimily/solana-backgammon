@@ -1,3 +1,4 @@
+use crate::state::RandomDice;
 use crate::{
     error::BackgammonError, instruction::BackgammonInstruction, state::Color, state::Game,
     state::GameState, state::Move,
@@ -28,7 +29,7 @@ impl Processor {
             BackgammonInstruction::InitGame { game_id } => {
                 Self::process_init_game(accounts, game_id, program_id)
             }
-            BackgammonInstruction::Roll {} => Self::process_roll(accounts, program_id),
+            BackgammonInstruction::SkipDouble {} => Self::process_skip_double(accounts, program_id),
             BackgammonInstruction::RequestDouble {} => {
                 Self::process_request_double(accounts, program_id)
             }
@@ -128,7 +129,7 @@ impl Processor {
         Ok(())
     }
 
-    fn process_roll(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramResult {
+    fn process_skip_double(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramResult {
         let account_iter = &mut accounts.iter();
         let player_info = next_account_info(account_iter)?;
         let game_info = next_account_info(account_iter)?;
@@ -139,41 +140,9 @@ impl Processor {
 
         msg!("Unpacking game account");
         let mut game = Game::unpack_unchecked(&game_info.data.borrow())?;
-        if game.state != GameState::Started && game.state != GameState::DoubleOrRoll {
-            msg!(
-                "Rolling is only possible when Started or DoubleOrRoll (state = {})",
-                game.state
-            );
-            return Err(BackgammonError::InvalidState.into());
-        }
-
-        let player_color = game.get_color(player_info.key);
-        if game.state == GameState::Started {
-            let player_index = player_color.index()?;
-            if game.dice[player_index] != 0 {
-                return Err(BackgammonError::InvalidState.into());
-            }
-            game.dice[player_index] = roll_die(program_id, &game, 0);
-            if game.dice[0] != 0 && game.dice[1] != 0 {
-                game.state = GameState::Rolled;
-                if game.dice[0] > game.dice[1] {
-                    game.turn = Color::White;
-                } else if game.dice[0] < game.dice[1] {
-                    game.turn = Color::Black;
-                } else {
-                    game.dice[0] = 0;
-                    game.dice[0] = 0;
-                }
-            }
-        } else {
-            if player_color != game.turn {
-                return Err(BackgammonError::UnauthorizedAction.into());
-            }
-            game.dice[0] = roll_die(program_id, &game, 0);
-            game.dice[1] = roll_die(program_id, &game, 1);
-            game.state = GameState::Rolled;
-            game.calc_max_moves();
-        }
+        let color = game.get_color(player_info.key);
+        let rdc = &mut PdaRandomDice::new(program_id, &game);
+        game.skip_double(color, rdc)?;
         Game::incr_and_pack(game, &mut &mut game_info.data.borrow_mut()[..])
     }
 
@@ -189,7 +158,9 @@ impl Processor {
         msg!("Unpacking game account");
         let mut game = Game::unpack_unchecked(&game_info.data.borrow())?;
         let color = game.get_color(player_info.key);
+
         game.request_double(color)?;
+
         Game::incr_and_pack(game, &mut &mut game_info.data.borrow_mut()[..])
     }
 
@@ -208,29 +179,12 @@ impl Processor {
 
         msg!("Unpacking game account");
         let mut game = Game::unpack_unchecked(&game_info.data.borrow())?;
-        if game.state != GameState::Doubled {
-            msg!("The opponent has not responded to the double yet.");
-            return Err(BackgammonError::InvalidState.into());
-        }
+        let rdc = &mut PdaRandomDice::new(program_id, &game);
 
-        let player_color = game.get_color(player_info.key);
-        if player_color != game.turn.opponent()? {
-            return Err(BackgammonError::UnauthorizedAction.into());
-        }
+        let color = game.get_color(player_info.key);
+        game.respond_to_double(color, accept, rdc)?;
 
-        if accept {
-            game.multiplier *= 2;
-            game.last_doubled = game.turn;
-            game.dice[0] = roll_die(program_id, &game, 0);
-            game.dice[1] = roll_die(program_id, &game, 1);
-            game.state = GameState::Rolled;
-            game.calc_max_moves();
-        } else {
-            game.winner = game.turn;
-            game.state = GameState::Finished;
-        }
-        Game::incr_and_pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
-        Ok(())
+        Game::incr_and_pack(game, &mut &mut game_info.data.borrow_mut()[..])
     }
 
     fn process_apply_moves(
@@ -252,95 +206,56 @@ impl Processor {
 
         msg!("Unpacking game account");
         let mut game = Game::unpack_unchecked(&game_info.data.borrow())?;
-        if game.state != GameState::Rolled {
-            msg!("The dice are not rolled yet");
-            return Err(BackgammonError::InvalidState.into());
-        }
+        let color = game.get_color(player_info.key);
+        let rdc = &mut PdaRandomDice::new(program_id, &game);
 
-        let player_color = game.get_color(player_info.key);
-        if player_color != game.turn {
-            msg!("It's not {}'s turn", player_color.to_string());
-            return Err(BackgammonError::UnauthorizedAction.into());
-        }
+        game.apply_moves(color, moves, rdc)?;
 
-        let mut values = vec![game.dice[0], game.dice[1]];
-        if game.dice[0] == game.dice[1] {
-            values.push(game.dice[0]);
-            values.push(game.dice[0]);
-        }
-        for i in 0..4 {
-            msg!(
-                "applying move {} for {} steps",
-                moves[i].start,
-                moves[i].steps
-            );
-            if moves[i].steps == 0 {
-                // TODO check if this is desired.
-                msg!("Only {} moves were available", i);
-                break;
-            }
-            if values.contains(&moves[i].steps) == false {
-                msg!("You can not move a checker for {} steps", moves[i].steps);
-                return Err(BackgammonError::InvalidMove.into());
-            }
-
-            game.board.apply_move(game.turn, moves[i])?;
-
-            let index = values.iter().position(|x| *x == moves[i].steps).unwrap();
-            values.remove(index);
-        }
-        msg!("Moves applied, updating the state...");
-        game.last_moves = moves;
-        game.turn = game.turn.opponent()?;
-        if game.last_doubled == game.turn || game.multiplier == 64 {
-            msg!("case 1");
-            game.dice[0] = roll_die(program_id, &game, 0);
-            game.dice[1] = roll_die(program_id, &game, 1);
-            game.state = GameState::Rolled;
-            game.calc_max_moves();
-        } else {
-            msg!("case 2");
-            game.dice[0] = 0;
-            game.dice[1] = 0;
-            game.state = GameState::DoubleOrRoll;
-        }
-        // return Err(BackgammonError::InvalidMove.into());
         msg!("Saving the game...");
         Game::incr_and_pack(game, &mut &mut game_info.data.borrow_mut()[..])?;
         Ok(())
     }
 }
 
-// fn random_gen(program_id: Pubkey, game: &Game, seed: u8) -> impl Fn(u8) -> u8 {
-//     move |seed: u8| -> u8 {
-//         // 5
-//         let seeds = &[
-//             game.white_pubkey.as_ref(),
-//             game.black_pubkey.as_ref(),
-//             &game.counter.to_le_bytes(),
-//             &[seed],
-//         ];
-//         // let (address, _bump) = Pubkey::find_program_address(seeds, &program_id);
-//         let address = Pubkey::new([0]);
-//         let mut total: i64 = 0;
-//         for i in 0..32 {
-//             total += (address.as_ref()[i] as i64) * 256_i64.pow((i % 4) as u32);
-//         }
-//         ((total % 6) + 1) as u8
-//     }
-// }
+pub struct PdaRandomDice {
+    program_id: Pubkey,
+    white_pubkey: Pubkey,
+    black_pubkey: Pubkey,
+    game_id: u64,
+    counter: u32,
+    seed: u32,
+}
 
-fn roll_die(program_id: &Pubkey, game: &Game, seed: u8) -> u8 {
-    let seeds = &[
-        game.white_pubkey.as_ref(),
-        game.black_pubkey.as_ref(),
-        &game.counter.to_le_bytes(),
-        &[seed],
-    ];
-    let (address, _bump) = Pubkey::find_program_address(seeds, program_id);
-    let mut total: i64 = 0;
-    for i in 0..32 {
-        total += (address.as_ref()[i] as i64) * 256_i64.pow((i % 4) as u32);
+impl PdaRandomDice {
+    pub fn new(program_id: &Pubkey, game: &Game) -> PdaRandomDice {
+        PdaRandomDice {
+            program_id: *program_id,
+            white_pubkey: game.white_pubkey,
+            black_pubkey: game.black_pubkey,
+            game_id: game.game_id,
+            counter: game.counter,
+            seed: 0,
+        }
     }
-    ((total % 6) + 1) as u8
+}
+
+impl RandomDice for PdaRandomDice {
+    fn generate(&mut self) -> u8 {
+        let seeds = &[
+            self.white_pubkey.as_ref(),
+            self.black_pubkey.as_ref(),
+            &self.game_id.to_le_bytes(),
+            &self.counter.to_le_bytes(),
+            &self.seed.to_le_bytes(),
+        ];
+        self.seed += 1;
+
+        let (address, _) = Pubkey::find_program_address(seeds, &self.program_id);
+        let address_bytes = address.as_ref();
+        let mut total: u16 = 0;
+        for i in 0..30 {
+            total += address_bytes[i] as u16;
+        }
+        (total % 6) as u8 + 1
+    }
 }
