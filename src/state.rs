@@ -12,6 +12,8 @@ use borsh::{BorshDeserialize, BorshSchema, BorshSerialize};
 
 use crate::error::BackgammonError;
 
+pub type Die = u8;
+
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
 pub struct Game {
     // 207 bytes
@@ -21,7 +23,7 @@ pub struct Game {
     pub black_pubkey: Pubkey,
     pub turn: Color,
     pub winner: Color,
-    pub dice: [u8; 2],
+    pub dice: [Die; 2],
     pub multiplier: u8,
     pub last_moves: [Move; 4],
     pub last_doubled: Color,
@@ -599,5 +601,5 @@ impl Default for Color {
 }
 
 pub trait RandomDice {
-    fn generate(&mut self) -> u8;
+    fn generate(&mut self) -> Die;
 }
