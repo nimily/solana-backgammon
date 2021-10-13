@@ -1,11 +1,14 @@
 const readline = require('readline-sync'); 
 const solana = require('@solana/web3.js');
 const buffer = require('buffer');
-const crypt = require("crypto");
+const crypt = require('crypto');
+const bs58 = require('bs58');
 
 const rpcUrl = "https://api.devnet.solana.com";
 let connection1 = new solana.Connection(rpcUrl, 'confirmed');
-let connection2 = new solana.Connection(rpcUrl, 'confirmed');
+const program_id = new solana.PublicKey("Aqqg8L83rjkNfhLzAeZ4Aq37TBZyXnvLPWRTMruTWmJ8");
+const system = solana.PublicKey.default;
+const rent = solana.SYSVAR_RENT_PUBKEY;
 
 let board = [-2, 0, 0, 0, 0, 5, 0, 3, 0, 0, 0, -5, 5, 0, 0, 0, -3, 0, -5, 0, 0, 0, 0, 2];
 let midBoard = [0, 0];
@@ -13,35 +16,26 @@ let rightBoard = [0, 0];
 let dice = [0, 0];
 let multiplier = 1;
 
-const game_id = crypt.randomBytes(8);
-console.log("game id", game_id);
+console.log("Welcome to solana-backgammon!");
+const secretKey = readline.question('Please enter your secret key: ');
+let player1;
+if (secretKey === "1") {
+    player1 = solana.Keypair.fromSeed(new Uint8Array(32).fill(1));
+} else if (secretKey === "2") {
+    player1 = solana.Keypair.fromSeed(new Uint8Array(32).fill(42));
+} else {
+    player1 = solana.Keypair.fromSecretKey(bs58.decode(secretKey));
+}
 
-const program_id = new solana.PublicKey("Aqqg8L83rjkNfhLzAeZ4Aq37TBZyXnvLPWRTMruTWmJ8");
-
-// let player1 = readline.question("Secret key string of player 1: ");
-// let player2 = readline.question("Secret key string of player 2: ");
-
-// player1 = getKeypair(player1);
-// player2 = getKeypair(player2);
-
-const player1 = solana.Keypair.fromSeed(new Uint8Array(32).fill(1));
-const player2 = solana.Keypair.fromSeed(new Uint8Array(32).fill(42));
-
-
-console.log("player1", player1.publicKey.toBase58());
-console.log("player2", player2.publicKey.toBase58());
-
-const system = solana.PublicKey.default;
-console.log("system program id", system.toBase58());
-const rent = solana.SYSVAR_RENT_PUBKEY;
-console.log("rent program id", rent.toBase58());
-
-function getKeypair(player) {
-    if (player != "") {
-        return solana.Keypair.fromSecretKey(Buffer.from(player));
-    } else {
-        return solana.Keypair.generate();
-    }
+let order;
+let game_id = readline.question("Room key you want to join (default: create room): ");
+if (game_id === "") {
+    game_id = crypt.randomBytes(8);
+    console.log("game key: ", bs58.encode(game_id));
+    order = -1;
+} else {
+    game_id = bs58.decode(game_id);
+    order = 1;
 }
 
 async function retry(transaction, player) {
@@ -50,7 +44,7 @@ async function retry(transaction, player) {
             await solana.sendAndConfirmTransaction(connection1, transaction, [player1]);
         } catch (error) {
             console.log(error.message);
-            if (error.message.includes("socket hang up")) {
+            if (error.message.includes("FetchError")) {
                 connection1 = new solana.Connection(rpcUrl, 'confirmed');
                 await retry(transaction, player);
                 console.log("reconnecting");
@@ -63,7 +57,7 @@ async function retry(transaction, player) {
             await solana.sendAndConfirmTransaction(connection2, transaction, [player2]);
         } catch (error) {
             console.log(error.message);
-            if (error.message.includes("socket hang up")) {
+            if (error.message.includes("FetchError")) {
                 connection2 = new solana.Connection(rpcUrl, 'confirmed');
                 await retry(transaction, player);
                 console.log("reconnecting");
@@ -81,7 +75,7 @@ async function getInfo(account, player) {
             info = await connection1.getAccountInfo(account);
         } catch (error) {
             console.log(error.message);
-            if (error.message.includes("socket hang up")) {
+            if (error.message.includes("FetchError")) {
                 connection1 = new solana.Connection(rpcUrl, 'confirmed');
                 info = await getInfo(account, player);
                 console.log("reconnecting");
@@ -94,7 +88,7 @@ async function getInfo(account, player) {
             info = await connection2.getAccountInfo(account);
         } catch (error) {
             console.log(error.message);
-            if (error.message.includes("socket hang up")) {
+            if (error.message.includes("FetchError")) {
                 connection2 = new solana.Connection(rpcUrl, 'confirmed');
                 info = await getInfo(account, player);
                 console.log("reconnecting");
@@ -219,6 +213,17 @@ function checkBoard(data) {
 
 (async () => {
     
+    let order;
+    let game_id = readline.question("Room key you want to join (default: create room): ");
+    if (game_id === "") {
+        game_id = crypt.randomBytes(8);
+        console.log("game key: ", bs58.encode(game_id));
+        order = -1;
+    } else {
+        game_id = bs58.decode(game_id);
+        order = 1;
+    }
+
     const [game, game_seed] = await solana.PublicKey.findProgramAddress([player1.publicKey.toBytes(), player2.publicKey.toBytes(), game_id], program_id);
     console.log("game", game.toBase58());
 
