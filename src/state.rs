@@ -14,7 +14,7 @@ use crate::error::BackgammonError;
 
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
 pub struct Game {
-    // 177 bytes
+    // 207 bytes
     pub game_id: u64,
     pub state: GameState,
     pub white_pubkey: Pubkey,
@@ -29,7 +29,7 @@ pub struct Game {
     pub counter: u32, // counts the number of times the state is saved (used in random generator)
     pub max_moves: u8,
     pub first_moves_len: u8,
-    pub first_moves: [Move; 15],
+    pub first_moves: [Move; 30],
 }
 
 impl Game {
@@ -264,8 +264,40 @@ impl Game {
     }
 
     fn calc_max_moves_unequal_dice(&mut self) -> Result<(), ProgramError> {
-        self.max_moves = 2;
+        self.max_moves = 0;
         self.first_moves_len = 0;
+
+        let mut starts: Vec<u8> = vec![];
+        if self.board.has_checker_on_bar(self.turn)? {
+            starts.push(self.turn.get_bar_index()? as u8);
+        } else {
+            for i in 1..=24 {
+                starts.push(i);
+            }
+        }
+
+        for i in 0..2 {
+            for start in &mut starts {
+                let mut board = self.board.clone();
+                let move_ = Move {
+                    start: *start,
+                    steps: self.dice[i],
+                };
+                match board.apply_move(self.turn, move_, false) {
+                    Ok(_) => {
+                        self.max_moves = 1;
+                        if board.has_move_for_die(self.turn, self.dice[1 - i])? {
+                            self.first_moves[self.first_moves_len as usize] = move_;
+                            self.first_moves_len += 1;
+                        }
+                    }
+                    Err(_) => {}
+                }
+            }
+        }
+        if self.first_moves_len > 0 {
+            self.max_moves = 2;
+        }
         Ok(())
     }
 }
@@ -295,17 +327,43 @@ impl Board {
         Ok((self.points[idx].n_pieces > 0) && (self.points[idx].color == player))
     }
 
+    pub fn has_move_for_die(&self, player: Color, die: u8) -> Result<bool, ProgramError> {
+        if self.has_checker_on_bar(player)? {
+            let move_ = Move {
+                start: player.get_bar_index()? as u8,
+                steps: die,
+            };
+            self.is_valid_move(player, move_, false)
+        } else {
+            for i in 0..24 {
+                let move_ = Move {
+                    start: i + 1,
+                    steps: die,
+                };
+                match self.is_valid_move(player, move_, false) {
+                    Ok(valid) => {
+                        if valid {
+                            return Ok(true);
+                        }
+                    }
+                    Err(_) => {}
+                }
+            }
+            Ok(false)
+        }
+    }
+
     pub fn is_valid_move(
         &self,
         player: Color,
         move_: Move,
         verbose: bool,
-    ) -> Result<(), ProgramError> {
+    ) -> Result<bool, ProgramError> {
         if self.points[move_.start as usize].color != player {
             if verbose {
                 msg!("{} cannot move the opponent's checkers", player.to_string());
             }
-            return Err(BackgammonError::InvalidMove.into());
+            return Ok(false);
         }
 
         let distance = self.distance(player, move_.start)?;
@@ -320,14 +378,14 @@ impl Board {
                         player.to_string()
                     );
                 }
-                return Err(BackgammonError::InvalidMove.into());
+                return Ok(false);
             }
 
             if distance != farthest && distance != move_.steps {
                 if verbose {
                     msg!("You cannot bear off a piece that is neither the farthest nor at n_steps away from the end");
                 }
-                return Err(BackgammonError::InvalidMove.into());
+                return Ok(false);
             }
         } else {
             let end = self.from_distance(player, distance - move_.steps)?;
@@ -335,10 +393,10 @@ impl Board {
                 if verbose {
                     msg!("Point {} is closed for {}", end, player.to_string());
                 }
-                return Err(BackgammonError::InvalidMove.into());
+                return Ok(false);
             }
         }
-        Ok(())
+        Ok(true)
     }
 
     pub fn apply_move(
@@ -347,7 +405,9 @@ impl Board {
         move_: Move,
         verbose: bool,
     ) -> Result<bool, ProgramError> {
-        self.is_valid_move(player, move_, verbose)?;
+        if self.is_valid_move(player, move_, verbose)? == false {
+            return Err(BackgammonError::InvalidMove.into());
+        }
 
         let point = &mut self.points[move_.start as usize];
         point.n_pieces -= 1;
@@ -431,7 +491,7 @@ impl IsInitialized for Game {
 impl Sealed for Game {}
 
 impl Pack for Game {
-    const LEN: usize = 177; // FIXME
+    const LEN: usize = 207; // FIXME
     fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
         let result = try_from_slice_unchecked::<Game>(src)?;
         Ok(result)
