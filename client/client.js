@@ -32,9 +32,11 @@ let game_id = readline.question("Room key you want to join (default: create room
 if (game_id === "") {
     game_id = crypt.randomBytes(8);
     console.log("game key:", bs58.encode(game_id));
+    console.log("You are red");
     order = 0;
 } else {
     game_id = bs58.decode(game_id);
+    console.log("You are green");
     order = 1;
 }
 
