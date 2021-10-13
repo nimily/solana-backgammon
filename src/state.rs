@@ -149,7 +149,7 @@ impl Game {
                 return Err(BackgammonError::InvalidMove.into());
             }
 
-            self.board.apply_move(self.turn, moves[i])?;
+            self.board.apply_move(self.turn, moves[i], true)?;
 
             let index = values.iter().position(|x| *x == moves[i].steps).unwrap();
             values.remove(index);
@@ -209,27 +209,60 @@ impl Game {
         return Game::pack(self, dst);
     }
 
-    pub fn calc_max_moves(&mut self) {
+    pub fn calc_max_moves(&mut self) -> Result<(), ProgramError> {
         if self.dice[0] == self.dice[1] {
-            self.calc_max_moves_equal_dice();
+            self.calc_max_moves_equal_dice()
         } else {
-            self.calc_max_moves_unequal_dice();
+            self.calc_max_moves_unequal_dice()
         }
     }
 
-    fn calc_max_moves_equal_dice(&mut self) {
+    fn calc_max_moves_equal_dice(&mut self) -> Result<(), ProgramError> {
         let die = self.dice[0];
-        let max_moves: u8 = 0;
+        let bar_index = self.turn.get_bar_index()? as u8;
+
+        let mut start = bar_index;
         let mut board = self.board.clone();
-        let bar_index = self.turn.get
-        while board.has_checker_on_bar(self.turn) {
-            if board.is_valid_move(self.turn, move_)
+
+        self.max_moves = 0;
+        while self.max_moves < 4 {
+            let move_ = Move {
+                start: start,
+                steps: die,
+            };
+
+            while board.has_checker_on_point(self.turn, start as usize)? && self.max_moves < 4 {
+                match board.apply_move(self.turn, move_, false) {
+                    Ok(_) => self.max_moves += 1,
+                    Err(_) => {
+                        if start == bar_index {
+                            return Ok(());
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if self.turn == Color::White {
+                start += 1;
+                if start == 25 {
+                    break;
+                }
+            } else {
+                start -= 1;
+                if start == 0 {
+                    break;
+                }
+            }
         }
 
+        Ok(())
     }
 
-    fn calc_max_moves_unequal_dice(&mut self) {
+    fn calc_max_moves_unequal_dice(&mut self) -> Result<(), ProgramError> {
         self.max_moves = 2;
+        Ok(())
     }
 }
 
@@ -251,12 +284,23 @@ impl Board {
 
     pub fn has_checker_on_bar(&self, player: Color) -> Result<bool, ProgramError> {
         let bar_index = player.get_bar_index()?;
-        Ok(self.points[bar_index].n_pieces > 0)
+        self.has_checker_on_point(player, bar_index)
     }
 
-    pub fn is_valid_move(&self, player: Color, move_: Move) -> Result<(), ProgramError> {
+    pub fn has_checker_on_point(&self, player: Color, idx: usize) -> Result<bool, ProgramError> {
+        Ok((self.points[idx].n_pieces > 0) && (self.points[idx].color == player))
+    }
+
+    pub fn is_valid_move(
+        &self,
+        player: Color,
+        move_: Move,
+        verbose: bool,
+    ) -> Result<(), ProgramError> {
         if self.points[move_.start as usize].color != player {
-            msg!("{} cannot move the opponent's checkers", player.to_string());
+            if verbose {
+                msg!("{} cannot move the opponent's checkers", player.to_string());
+            }
             return Err(BackgammonError::InvalidMove.into());
         }
 
@@ -266,29 +310,40 @@ impl Board {
 
             if farthest > 6 {
                 // not all pieces are in home
-                msg!(
-                    "{} can not bear off as has pieces in the outer board",
-                    player.to_string()
-                );
+                if verbose {
+                    msg!(
+                        "{} can not bear off as has pieces in the outer board",
+                        player.to_string()
+                    );
+                }
                 return Err(BackgammonError::InvalidMove.into());
             }
 
             if distance != farthest && distance != move_.steps {
-                msg!("You cannot bear off a piece that is neither the farthest nor at n_steps away from the end");
+                if verbose {
+                    msg!("You cannot bear off a piece that is neither the farthest nor at n_steps away from the end");
+                }
                 return Err(BackgammonError::InvalidMove.into());
             }
         } else {
             let end = self.from_distance(player, distance - move_.steps)?;
             if self.is_closed(player, end)? {
-                msg!("Point {} is closed for {}", end, player.to_string());
+                if verbose {
+                    msg!("Point {} is closed for {}", end, player.to_string());
+                }
                 return Err(BackgammonError::InvalidMove.into());
             }
         }
         Ok(())
     }
 
-    pub fn apply_move(&mut self, player: Color, move_: Move) -> Result<bool, ProgramError> {
-        self.is_valid_move(player, move_)?;
+    pub fn apply_move(
+        &mut self,
+        player: Color,
+        move_: Move,
+        verbose: bool,
+    ) -> Result<bool, ProgramError> {
+        self.is_valid_move(player, move_, verbose)?;
 
         let point = &mut self.points[move_.start as usize];
         point.n_pieces -= 1;
