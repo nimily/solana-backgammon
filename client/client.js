@@ -58,18 +58,20 @@ if (order === 0) {
 }
 
 async function retry(transaction) {
+    let confirmation;
     try {
-        await solana.sendAndConfirmTransaction(connection, transaction, [myself]);
+        confirmation = await solana.sendAndConfirmTransaction(connection, transaction, [myself]);
     } catch (error) {
         console.log(error.message);
         if (error.message.includes("socket hang up") || error.message.includes("FetchError")) {
             connection = new solana.Connection(rpcUrl, 'confirmed');
-            await retry(transaction);
+            confirmation = await retry(transaction);
             console.log("reconnecting");
         } else {
             throw error;
         }
     }
+    return confirmation;
 }
 
 async function getInfo(account) {
@@ -80,7 +82,7 @@ async function getInfo(account) {
         console.log(error.message);
         if (error.message.includes("socket hang up") || error.message.includes("FetchError")) {
             connection = new solana.Connection(rpcUrl, 'confirmed');
-            info = await getInfo(account, myself);
+            info = await getInfo(account);
             console.log("reconnecting");
         } else {
             throw error;
@@ -303,7 +305,7 @@ function checkBoard(data) {
                             data: buffer.Buffer.from([1])
                             
                         });
-                        await retry(new solana.Transaction().add(roll));
+                        console.log(await retry(new solana.Transaction().add(roll)));
                         console.log(`you rolled dices`);
                     }
                 } else {
