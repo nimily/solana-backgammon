@@ -14,7 +14,7 @@ use crate::error::BackgammonError;
 
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
 pub struct Game {
-    // 146 bytes
+    // 177 bytes
     pub game_id: u64,
     pub state: GameState,
     pub white_pubkey: Pubkey,
@@ -28,6 +28,8 @@ pub struct Game {
     pub board: Board,
     pub counter: u32, // counts the number of times the state is saved (used in random generator)
     pub max_moves: u8,
+    pub first_moves_len: u8,
+    pub first_moves: [Move; 15],
 }
 
 impl Game {
@@ -186,7 +188,7 @@ impl Game {
                     } else {
                         self.turn = Color::Black;
                     }
-                    self.calc_max_moves();
+                    self.calc_max_moves()?;
                 } else {
                     self.dice[0] = 0;
                     self.dice[1] = 0;
@@ -199,7 +201,7 @@ impl Game {
             self.dice[0] = rdc.generate();
             self.dice[1] = rdc.generate();
             self.state = GameState::Rolled;
-            self.calc_max_moves();
+            self.calc_max_moves()?;
         }
         Ok(())
     }
@@ -225,6 +227,7 @@ impl Game {
         let mut board = self.board.clone();
 
         self.max_moves = 0;
+        self.first_moves_len = 0;
         while self.max_moves < 4 {
             let move_ = Move {
                 start: start,
@@ -262,6 +265,7 @@ impl Game {
 
     fn calc_max_moves_unequal_dice(&mut self) -> Result<(), ProgramError> {
         self.max_moves = 2;
+        self.first_moves_len = 0;
         Ok(())
     }
 }
@@ -427,7 +431,7 @@ impl IsInitialized for Game {
 impl Sealed for Game {}
 
 impl Pack for Game {
-    const LEN: usize = 146; // FIXME
+    const LEN: usize = 177; // FIXME
     fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
         let result = try_from_slice_unchecked::<Game>(src)?;
         Ok(result)
