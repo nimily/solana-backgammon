@@ -189,7 +189,7 @@ function checkStep(step) {
 }
 
 function checkStart(start) {
-    if (start <= 24 || start >= 1) {
+    if (start <= 24 && start >= 1) {
         return true;
     }
     console.log("start out of boundary");
