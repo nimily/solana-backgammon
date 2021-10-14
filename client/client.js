@@ -220,7 +220,7 @@ function checkBoard(data) {
         game_id = crypt.randomBytes(8);
         you = readline.question("Player you want to add: ");
         you = translatePK(you);
-        console.log("You are red");
+        console.log("\x1b[31mYou are red\x1b[0m");
         order = 0;
         [game, game_seed] = await solana.PublicKey.findProgramAddress([myself.publicKey.toBytes(), you.toBytes(), game_id], program_id);
         console.log("game pubkey:", game.toBase58());
@@ -258,8 +258,10 @@ function checkBoard(data) {
                     const black = game_info.data.slice(41, 73);
                     if (bs58.encode(white) === myself.publicKey.toBase58()) {
                         order = 0;
+                        console.log("\x1b[31mYou are red\x1b[0m");
                     } else if (bs58.encode(black) === myself.publicKey.toBase58()) {
                         order = 1;
+                        console.log("\x1b[32mYou are green\x1b[0m")
                     }
                     if (checkBoard(game_info.data)) {
                         display();
