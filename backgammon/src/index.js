@@ -22,6 +22,7 @@ let game_seed;
 
 let click_cnt = 0;
 let click_pos;
+let doubled = false;
 
 async function retry(transaction) {
   let confirmation;
@@ -283,6 +284,9 @@ class Game extends React.Component {
         <div id="multiplier">
           multiplier: {multiplier}
         </div>
+        <button id="double" onClick={double}>
+              double
+        </button>
       </div>
     );
   }
@@ -389,8 +393,8 @@ async function start() {
                 break;
             case 2:
                 if (turn === order) {
-                    const request = prompt(`Do you want to double (Y/N, default N): `);
-                    if (request[0] === "Y" || request[0] === "y") {
+                    if (doubled) {
+                        doubled = false;
                         const double = new solana.TransactionInstruction({
                             programId: program_id,
                             keys: [
@@ -804,9 +808,9 @@ async function start() {
     console.log("game finishes");
     const winner = game_info.data[74] - 1;
     if (winner === order) {
-        console.log(`You win ${multiplier}`);
+      document.getElementById("message").textContent = `You win ${multiplier}`;
     } else {
-        console.log(`You lose ${multiplier}`);
+      document.getElementById("message").textContent = `You lose ${multiplier}`;
     }
 
 }
@@ -816,4 +820,8 @@ function move(slot) {
     click_cnt = 1 - click_cnt;
     click_pos = slot;
   }
+}
+
+function double() {
+  doubled = true;
 }
