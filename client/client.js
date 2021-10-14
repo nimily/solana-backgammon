@@ -15,50 +15,31 @@ let midBoard = [0, 0];
 let rightBoard = [0, 0];
 let dice = [0, 0];
 let multiplier = 1;
-
-console.log("Welcome to solana-backgammon!");
-const secretKey = readline.question('Please enter your secret key: ');
 let myself;
-if (secretKey === "1") {
-    myself = solana.Keypair.fromSeed(new Uint8Array(32).fill(1));
-} else if (secretKey === "2") {
-    myself = solana.Keypair.fromSeed(new Uint8Array(32).fill(42));
-} else {
-    myself = solana.Keypair.fromSecretKey(bs58.decode(secretKey));
+
+function translatePK(pk) {
+    if (pk === "1") {
+        return solana.Keypair.fromSeed(new Uint8Array(32).fill(1)).publicKey;
+    } else if (pk === "2") {
+        return solana.Keypair.fromSeed(new Uint8Array(32).fill(42)).publicKey;
+    } else {
+        return new solana.PublicKey(pk);
+    }
 }
 
-let order;
-let game_id = readline.question("Room key you want to join (default: create room): ");
-if (game_id === "") {
-    game_id = crypt.randomBytes(8);
-    console.log("game key:", bs58.encode(game_id));
-    console.log("You are red");
-    order = 0;
-} else {
-    game_id = bs58.decode(game_id);
-    console.log("You are green");
-    order = 1;
-}
-
-let you = readline.question("Player you want to add: ");
-if (you === "1") {
-    you = solana.Keypair.fromSeed(new Uint8Array(32).fill(1)).publicKey;
-} else if (you === "2") {
-    you = solana.Keypair.fromSeed(new Uint8Array(32).fill(42)).publicKey;
-} else {
-    you = new solana.PublicKey(you);
-}
-
-let player1;
-let player2;
-if (order === 0) {
-    [player1, player2] = [myself.publicKey, you];
-} else {
-    [player1, player2] = [you, myself.publicKey];
+function translateSK(sk) {
+    if (sk === "1") {
+        return solana.Keypair.fromSeed(new Uint8Array(32).fill(1));
+    } else if (sk === "2") {
+        return solana.Keypair.fromSeed(new Uint8Array(32).fill(42));
+    } else {
+        return solana.Keypair.fromSecretKey(bs58.decode(sk));
+    }
 }
 
 let game;
 let game_seed;
+
 async function retry(transaction) {
     let confirmation;
     try {
@@ -207,7 +188,7 @@ function checkBoard(data) {
     for (let i = 0; i < 24; ++i) {
         const actual = (info[2+i*2] * 2 - 3) * info[3+i*2];
         if (actual != board[i]) {
-            console.log("board changed:", i, actual);
+            console.log("board changed:", i + 1, actual);
             board[i] = actual;
             changed = true;
         }
@@ -228,12 +209,29 @@ function checkBoard(data) {
 
 (async () => {
 
-    [game, game_seed] = await solana.PublicKey.findProgramAddress([player1.toBytes(), player2.toBytes(), game_id], program_id);
-    console.log("game pubkey:", game.toBase58());
+    console.log("Welcome to solana-backgammon!");
+    const secretKey = readline.question('Please enter your secret key: ');
+    myself = translateSK(secretKey);
 
-    let status = 0;
+    let order;
+    let you;
+    let game_id = readline.question("Room key you want to join (default: create room): ");
+    if (game_id === "") {
+        game_id = crypt.randomBytes(8);
+        you = readline.question("Player you want to add: ");
+        you = translatePK(you);
+        console.log("You are red");
+        order = 0;
+        [game, game_seed] = await solana.PublicKey.findProgramAddress([myself.publicKey.toBytes(), you.toBytes(), game_id], program_id);
+        console.log("game pubkey:", game.toBase58());
+    } else {
+        order = 1;
+        game = new solana.PublicKey(game_id);
+    }
+
     let turn;
     let game_info;
+    let status = 0;
     while (status != 5) {
         switch (status) {
             case 0:
@@ -241,8 +239,8 @@ function checkBoard(data) {
                     const initialize = new solana.TransactionInstruction({
                         programId: program_id,
                         keys: [
-                            {pubkey: player1, isSigner: false, isWritable: false},
-                            {pubkey: player2, isSigner: false, isWritable: false},
+                            {pubkey: myself.publicKey, isSigner: false, isWritable: false},
+                            {pubkey: you, isSigner: false, isWritable: false},
                             {pubkey: game, isSigner: false, isWritable: true},
                             {pubkey: system, isSigner: false, isWritable: false},
                             {pubkey: rent, isSigner: false, isWritable: false}
@@ -256,6 +254,17 @@ function checkBoard(data) {
                 }
                 game_info = await getInfo();
                 if (game_info) {
+                    const white = game_info.data.slice(9, 41);
+                    const black = game_info.data.slice(41, 73);
+                    if (bs58.encode(white) === myself.publicKey.toBase58()) {
+                        order = 0;
+                    } else if (bs58.encode(black) === myself.publicKey.toBase58()) {
+                        order = 1;
+                    }
+                    if (checkBoard(game_info.data)) {
+                        display();
+                    }
+                    turn = game_info.data[73] - 1;
                     status = game_info.data[8];
                 }
                 break;
