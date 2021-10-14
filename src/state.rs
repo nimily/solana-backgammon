@@ -12,6 +12,8 @@ use borsh::{BorshDeserialize, BorshSchema, BorshSerialize};
 
 use crate::error::BackgammonError;
 
+pub type Die = u8;
+
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
 pub struct Game {
     // 207 bytes
@@ -21,7 +23,7 @@ pub struct Game {
     pub black_pubkey: Pubkey,
     pub turn: Color,
     pub winner: Color,
-    pub dice: [u8; 2],
+    pub dice: [Die; 2],
     pub multiplier: u8,
     pub last_moves: [Move; 4],
     pub last_doubled: Color,
@@ -220,6 +222,7 @@ impl Game {
     }
 
     fn calc_max_moves_equal_dice(&mut self) -> Result<(), ProgramError> {
+        msg!("calc_max_moves_equal_dice");
         let die = self.dice[0];
         let bar_index = self.turn.get_bar_index()? as u8;
 
@@ -264,6 +267,7 @@ impl Game {
     }
 
     fn calc_max_moves_unequal_dice(&mut self) -> Result<(), ProgramError> {
+        msg!("calc_max_moves_unequal_dice");
         self.max_moves = 0;
         self.first_moves_len = 0;
 
@@ -277,7 +281,9 @@ impl Game {
         }
 
         for i in 0..2 {
+            msg!("tryding die {} first...", i);
             for start in &mut starts {
+                msg!("start {}...", start);
                 let mut board = self.board.clone();
                 let move_ = Move {
                     start: *start,
@@ -448,7 +454,7 @@ impl Board {
             Color::White => {
                 for i in (0..25).rev() {
                     if self.points[24 - i].color == Color::White {
-                        return Ok(i as u8);
+                        return Ok(i as u8 + 1);
                     }
                 }
                 return Ok(0);
@@ -456,7 +462,7 @@ impl Board {
             Color::Black => {
                 for i in (0..25).rev() {
                     if self.points[i + 1].color == Color::Black {
-                        return Ok(i as u8);
+                        return Ok(i as u8 + 1);
                     }
                 }
                 return Ok(0);
@@ -599,5 +605,5 @@ impl Default for Color {
 }
 
 pub trait RandomDice {
-    fn generate(&mut self) -> u8;
+    fn generate(&mut self) -> Die;
 }

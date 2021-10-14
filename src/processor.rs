@@ -1,7 +1,8 @@
 use crate::state::RandomDice;
 use crate::{
-    error::BackgammonError, instruction::BackgammonInstruction, state::Color, state::Game,
-    state::GameState, state::Move,
+    error::BackgammonError,
+    instruction::BackgammonInstruction,
+    state::{Color, Die, Game, GameState, Move},
 };
 use borsh::BorshDeserialize;
 use solana_program::program_pack::IsInitialized;
@@ -240,7 +241,7 @@ impl PdaRandomDice {
 }
 
 impl RandomDice for PdaRandomDice {
-    fn generate(&mut self) -> u8 {
+    fn generate(&mut self) -> Die {
         let seeds = &[
             self.white_pubkey.as_ref(),
             self.black_pubkey.as_ref(),
@@ -256,6 +257,6 @@ impl RandomDice for PdaRandomDice {
         for i in 0..30 {
             total += address_bytes[i] as u16;
         }
-        (total % 6) as u8 + 1
+        ((total % 6) + 1) as Die
     }
 }
