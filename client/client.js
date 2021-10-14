@@ -57,6 +57,8 @@ if (order === 0) {
     [player1, player2] = [you, myself.publicKey];
 }
 
+let game;
+let game_seed;
 async function retry(transaction) {
     let confirmation;
     try {
@@ -74,15 +76,15 @@ async function retry(transaction) {
     return confirmation;
 }
 
-async function getInfo(account) {
+async function getInfo() {
     let info;
     try {
-        info = await connection.getAccountInfo(account);
+        info = await connection.getAccountInfo(game, "processed");
     } catch (error) {
         console.log(error.message);
         if (error.message.includes("socket hang up") || error.message.includes("FetchError")) {
             connection = new solana.Connection(rpcUrl, 'confirmed');
-            info = await getInfo(account);
+            info = await getInfo();
             console.log("reconnecting");
         } else {
             throw error;
@@ -226,7 +228,7 @@ function checkBoard(data) {
 
 (async () => {
 
-    const [game, game_seed] = await solana.PublicKey.findProgramAddress([player1.toBytes(), player2.toBytes(), game_id], program_id);
+    [game, game_seed] = await solana.PublicKey.findProgramAddress([player1.toBytes(), player2.toBytes(), game_id], program_id);
     console.log("game pubkey:", game.toBase58());
 
     let status = 0;
@@ -252,7 +254,7 @@ function checkBoard(data) {
                 } else {
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
-                game_info = await getInfo(game);
+                game_info = await getInfo();
                 if (game_info) {
                     status = game_info.data[8];
                 }
@@ -274,7 +276,7 @@ function checkBoard(data) {
                 } else {
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
-                game_info = await getInfo(game);
+                game_info = await getInfo();
                 if (checkBoard(game_info.data)) {
                     display();
                 }
@@ -306,12 +308,12 @@ function checkBoard(data) {
                             
                         });
                         await retry(new solana.Transaction().add(roll));
-                        console.log(`you rolled dices`);
+                        console.log(`you rolled dice`);
                     }
                 } else {
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
-                game_info = await getInfo(game);
+                game_info = await getInfo();
                 if (checkBoard(game_info.data)) {
                     display();
                 }
@@ -346,7 +348,7 @@ function checkBoard(data) {
                 } else {
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
-                game_info = await getInfo(game);
+                game_info = await getInfo();
                 if (checkBoard(game_info.data)) {
                     display();
                 }
@@ -356,23 +358,19 @@ function checkBoard(data) {
                 if (order === turn) {
                     let avail;
                     let checkFirstMove = false;
-                    let move_len = 0;
-                    let possibility;
+                    let move_len = game_info.data[146];;
+                    let possibility = game_info.data.slice(147, 147 + move_len * 2);
+                    const maxMove = game_info.data[145];
                     if (dice[0] === dice[1]) {
                         avail = [...dice, ...dice];
                     } else {
                         avail = [...dice];
-                        const maxMove = game_info.data[145];
-                        if (maxMove > 0) {
-                            checkFirstMove = true;
-                            move_len = game_info.data[146];
-                            possibility = game_info.data.slice(147, 147 + move_len * 2);
-                        }
+                        checkFirstMove = true;
                     }
                     const actions = Buffer.alloc(8);
                     let action_cnt = 0;
-                    while (checkMove(turn, avail)) {
-                        if (turn === 0) {
+                    while (action_cnt < maxMove) {
+                        if (order === 0) {
                             if (midBoard[0] > 0) {
                                 console.log("Your available moves are", avail);
                                 const step = parseInt(readline.question("How many steps do you want to move: "));
@@ -454,6 +452,23 @@ function checkBoard(data) {
                                     }
                                 }
                                 checkFirstMove = false;
+
+                                if (start + step - 1 >= 24) {
+                                    let furthest = 24;
+                                    for (let i = 23; i >= 0; --i) {
+                                        if (board[i] < 0) {
+                                            furthest = i;
+                                        }
+                                    }
+                                    if (furthest < 18) {
+                                        console.log("You can not bear off");
+                                        continue;
+                                    }
+                                    if ((start != furthest + 1) && (start + step - 1 != 24)) {
+                                        console.log("You can not bear off this one");
+                                        continue;
+                                    }
+                                }
 
                                 avail.splice(i, 1);
                                 board[start-1] += 1;
@@ -547,6 +562,23 @@ function checkBoard(data) {
                                 }
                                 checkFirstMove = false;
 
+                                if (start - step - 1 < 0) {
+                                    let furthest = -1;
+                                    for (let i = 0; i < 24; ++i) {
+                                        if (board[i] > 0) {
+                                            furthest = i;
+                                        }
+                                    }
+                                    if (furthest >= 6) {
+                                        console.log("You can not bear off");
+                                        continue;
+                                    }
+                                    if ((start != furthest + 1) && (start - step != 0)) {
+                                        console.log("You can not bear off this one");
+                                        continue;
+                                    }
+                                }
+
                                 let i = avail.indexOf(step);
                                 if (i === -1) {
                                     console.log("There is no such move");
@@ -582,7 +614,7 @@ function checkBoard(data) {
                 } else {
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
-                game_info = await getInfo(game);
+                game_info = await getInfo();
                 if (checkBoard(game_info.data)) {
                     display();
                 }
