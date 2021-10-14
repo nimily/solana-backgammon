@@ -513,7 +513,7 @@ async function start() {
                                     continue;
                                 }
 
-                                if (checkFirstMove) {
+                                if (checkFirstMove && move_len > 0) {
                                     let found = false;
                                     for (let i = 0; i < move_len; ++i) {
                                         if ((possibility[2*i] === 0) && (possibility[2*i+1] === step)) {
@@ -583,7 +583,7 @@ async function start() {
                                     continue;
                                 }
 
-                                if (checkFirstMove) {
+                                if (checkFirstMove && move_len > 0) {
                                     let found = false;
                                     for (let i = 0; i < move_len; ++i) {
                                         if ((possibility[2*i] === start) && (possibility[2*i+1] === step)) {
@@ -660,7 +660,7 @@ async function start() {
                                     continue;
                                 }
 
-                                if (checkFirstMove) {
+                                if (checkFirstMove && move_len > 0) {
                                     let found = false;
                                     for (let i = 0; i < move_len; ++i) {
                                         if ((possibility[2*i] === 25) && (possibility[2*i+1] === step)) {
@@ -727,7 +727,7 @@ async function start() {
                                     continue;
                                 }
 
-                                if (checkFirstMove) {
+                                if (checkFirstMove && move_len > 0) {
                                     let found = false;
                                     for (let i = 0; i < move_len; ++i) {
                                         if ((possibility[2*i] === start) && (possibility[2*i+1] === step)) {
