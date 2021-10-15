@@ -14,6 +14,8 @@ use crate::error::BackgammonError;
 
 pub type Die = u8;
 
+const TOTAL_CHECKER: u8 = 15;
+
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
 pub struct Game {
     // 207 bytes
@@ -138,16 +140,16 @@ impl Game {
             values.push(self.dice[0]);
         }
         for i in 0..4 {
-            msg!(
-                "applying move {} for {} steps",
-                moves[i].start,
-                moves[i].steps
-            );
             if moves[i].steps == 0 {
                 // TODO check if this is desired.
                 msg!("Only {} moves were available", i);
                 break;
             }
+            msg!(
+                "applying move {} for {} steps",
+                moves[i].start,
+                moves[i].steps
+            );
             if values.contains(&moves[i].steps) == false {
                 msg!("You can not move a checker for {} steps", moves[i].steps);
                 return Err(BackgammonError::InvalidMove.into());
@@ -160,6 +162,11 @@ impl Game {
         }
         msg!("Moves applied, updating the state...");
         self.last_moves = moves;
+        if self.board.borne[self.turn.index()?] == TOTAL_CHECKER {
+            self.winner = self.turn;
+            self.state = GameState::Finished;
+            return Ok(());
+        }
         self.turn = self.turn.opponent()?;
         if self.last_doubled == self.turn || self.multiplier == 64 {
             self.roll_dice(self.turn, rdc)
