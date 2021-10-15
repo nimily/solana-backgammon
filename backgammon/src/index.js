@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
+import './index.css';
 const solana = require('@solana/web3.js');
 const buffer = require('buffer');
 const crypt = require('crypto');
@@ -23,6 +24,9 @@ let game_seed;
 let click_cnt = 0;
 let click_pos;
 let doubled = false;
+let status = 0;
+let turn;
+let game_info;
 
 async function retry(transaction) {
   let confirmation;
@@ -97,13 +101,13 @@ function checkStart(start) {
 function checkBoard(data) {
   let changed = false;
   const info = data.slice(87, 141);
-  if ((info[52] != rightBoard[0]) || (info[53] != rightBoard[1])) {
+  if ((info[52] !== rightBoard[0]) || (info[53] !== rightBoard[1])) {
       console.log("right board changed:", info[52], info[53]);
       rightBoard[0] = info[52];
       rightBoard[1] = info[53];
       changed = true;
   }
-  if ((info[1] != midBoard[0]) || (info[51] != midBoard[1])) {
+  if ((info[1] !== midBoard[0]) || (info[51] !== midBoard[1])) {
       console.log("mid board changed:", info[1], info[51]);
       midBoard[0] = info[1];
       midBoard[1] = info[51];
@@ -111,19 +115,19 @@ function checkBoard(data) {
   }
   for (let i = 0; i < 24; ++i) {
       const actual = (info[2+i*2] * 2 - 3) * info[3+i*2];
-      if (actual != board[i]) {
+      if (actual !== board[i]) {
           console.log("board changed:", i + 1, actual);
           board[i] = actual;
           changed = true;
       }
   }
-  if ((dice[0] != data[75]) || (dice[1] != data[76])) {
+  if ((dice[0] !== data[75]) || (dice[1] !== data[76])) {
       console.log("dice changed:", data[75], data[76]);
       dice[0] = data[75];
       dice[1] = data[76];
       changed = true;
   }
-  if (multiplier != data[77]) {
+  if (multiplier !== data[77]) {
       console.log("multiplier changed:", data[77]);
       multiplier = data[77];
       changed = true;
@@ -168,6 +172,15 @@ function display() {
   }
   document.getElementById("dice").textContent = `dice: ${dice[0]}, ${dice[1]}`
   document.getElementById("multiplier").textContent = `multiplier: ${multiplier}`
+  if (click_cnt === 1) {
+    if (click_pos === 0) {
+      document.getElementById(`mid0`).style.background = "blue";
+    } else if (click_pos === 25) {
+      document.getElementById(`mid1`).style.background = "blue";
+    } else {
+      document.getElementById(`slot${click_pos}`).style.background = "blue";
+    }
+  }
 }
 
 class Game extends React.Component {
@@ -181,10 +194,9 @@ class Game extends React.Component {
           game public key: {game}
         </div>
         <div id="order">
-          you are:
         </div>
         <div id="message">
-          game is not started
+          Game is not started
         </div>
         <div id="upper">
           <button id="slot13" onClick={move(13)}>
@@ -223,11 +235,11 @@ class Game extends React.Component {
           <button id="slot24" onClick={move(24)}>
               0
           </button>
-          middle
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
           <button id="mid1" onClick={move(25)}>
               0
           </button>
-          right
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
           <button id="right0" onClick={move(25)}>
               0
           </button>
@@ -269,11 +281,11 @@ class Game extends React.Component {
           <button id="slot1" onClick={move(1)}>
               0
           </button>
-          middle
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
           <button id="mid0" onClick={move(0)}>
               0
           </button>
-          right
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
           <button id="right1" onClick={move(0)}>
               0
           </button>
@@ -312,7 +324,7 @@ async function start() {
         you = translatePK(you);
         console.log("You are red");
         order = 0;
-        document.getElementById('order').textContent = `you are red`;
+        document.getElementById('order').textContent = `You are red`;
         [game, game_seed] = await solana.PublicKey.findProgramAddress([myself.publicKey.toBytes(), you.toBytes(), game_id], program_id);
         document.getElementById('game-key').textContent = `game public key: ${game.toBase58()}`;
         console.log("game pubkey:", game.toBase58());
@@ -321,13 +333,11 @@ async function start() {
         game = new solana.PublicKey(game_id);
         document.getElementById('game-key').textContent = `game public key: ${game.toBase58()}`;
     }
-    let turn;
-    let game_info;
-    let status = 0;
-    while (status != 5) {
+    while (status !== 5) {
         switch (status) {
             case 0:
                 if (order === 0) {
+                  document.getElementById("message").textContent = "Initializing the game";
                     const initialize = new solana.TransactionInstruction({
                         programId: program_id,
                         keys: [
@@ -341,9 +351,9 @@ async function start() {
                     });
                     await retry(new solana.Transaction().add(initialize));
                     console.log("Initialized");
-                    document.getElementById("message").textContent = "initialized";
+                    document.getElementById("message").textContent = "Initialized";
                 } else {
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                  await longWait();
                 }
                 game_info = await getInfo();
                 if (game_info) {
@@ -351,12 +361,12 @@ async function start() {
                     const black = game_info.data.slice(41, 73);
                     if (bs58.encode(white) === myself.publicKey.toBase58()) {
                         order = 0;
-                        document.getElementById('order').textContent = `you are red`;
-                        console.log("You are red");
+                        document.getElementById('order').textContent = `You are red`;
+                        console.log("you are red");
                     } else if (bs58.encode(black) === myself.publicKey.toBase58()) {
                         order = 1;
-                        document.getElementById('order').textContent = `you are green`;
-                        console.log("You are green")
+                        document.getElementById('order').textContent = `You are green`;
+                        console.log("you are green")
                     }
                     if (checkBoard(game_info.data)) {
                         display();
@@ -368,7 +378,7 @@ async function start() {
             case 1: 
                 if (dice[order] === 0) {
                     console.log("deciding first player");
-                    document.getElementById("message").textContent = "deciding first player";
+                    document.getElementById("message").textContent = "Deciding first player";
                     const roll = new solana.TransactionInstruction({
                         programId: program_id,
                         keys: [
@@ -380,21 +390,17 @@ async function start() {
                     });
                     await retry(new solana.Transaction().add(roll));
                     console.log("you rolled");
-                    document.getElementById("message").textContent = "you rolled";
+                    document.getElementById("message").textContent = "You rolled";
                 } else {
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    await longWait();
                 }
-                game_info = await getInfo();
-                if (checkBoard(game_info.data)) {
-                    display();
-                }
-                turn = game_info.data[73] - 1;
-                status = game_info.data[8];
+                await syncChain();
                 break;
             case 2:
                 if (turn === order) {
                     if (doubled) {
                         doubled = false;
+                        document.getElementById("double").style.background = "white";
                         const double = new solana.TransactionInstruction({
                             programId: program_id,
                             keys: [
@@ -405,7 +411,7 @@ async function start() {
                         });
                         await retry(new solana.Transaction().add(double));
                         console.log(`you want to double`);
-                        document.getElementById("message").textContent = "you want to double";
+                        document.getElementById("message").textContent = "You want to double";
                     } else {
                         const roll = new solana.TransactionInstruction({
                             programId: program_id,
@@ -418,21 +424,17 @@ async function start() {
                         });
                         await retry(new solana.Transaction().add(roll));
                         console.log(`you rolled dice`);
-                        document.getElementById("message").textContent = "you rolled dice";
+                        document.getElementById("message").textContent = "You rolled dice";
                     }
                 } else {
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    await longWait();
                 }
-                game_info = await getInfo();
-                if (checkBoard(game_info.data)) {
-                    display();
-                }
-                status = game_info.data[8];
+                await syncChain();
                 break;
             case 4:
-                if (turn != order) {
-                    const reply = prompt(`Do you accept to double (Y/N, default N): `);
-                    if (reply[0] === "Y" || reply[0] === "y") {
+                if (turn !== order) {
+                    const reply = prompt(`Do you accept to double (Y/N, default Y): `);
+                    if (reply === "" || reply[0] === "Y" || reply[0] === "y") {
                         const accept = new solana.TransactionInstruction({
                             programId: program_id,
                             keys: [
@@ -443,7 +445,7 @@ async function start() {
                         });
                         await retry(new solana.Transaction().add(accept));
                         console.log(`you accepted`);
-                        document.getElementById("message").textContent = "you accepted";
+                        document.getElementById("message").textContent = "You accepted double";
                     } else {
                         const accept = new solana.TransactionInstruction({
                             programId: program_id,
@@ -455,16 +457,12 @@ async function start() {
                         });
                         await retry(new solana.Transaction().add(accept));
                         console.log(`you surrendered`);
-                        document.getElementById("message").textContent = "you surrendered";
+                        document.getElementById("message").textContent = "You surrendered";
                     }
                 } else {
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    await longWait();
                 }
-                game_info = await getInfo();
-                if (checkBoard(game_info.data)) {
-                    display();
-                }
-                status = game_info.data[8];
+                await syncChain();
                 break;
             case 3:
                 if (order === turn) {
@@ -486,19 +484,16 @@ async function start() {
                             if (midBoard[0] > 0) {
                                 document.getElementById("message").textContent = `Your available moves are ${avail}`;
                                 console.log(click_cnt, click_pos);
-                                if (click_cnt != 1) {
-                                  await new Promise(resolve => setTimeout(resolve, 100));
-                                  continue;
-                                } 
+                                display();
+                                await shortWait(1);
                                 const start = click_pos;
-                                if (start != 0) {
+                                if (start !== 0) {
                                   alert("You should start from middle");
                                   click_cnt = 0;
                                   continue;
                                 }
-                                while (click_cnt != 0) {
-                                  await new Promise(resolve => setTimeout(resolve, 100));
-                                } 
+                                display();
+                                await shortWait(0);
                                 const step = click_pos;
                                 if (!checkStep(step)) {
                                     continue;
@@ -542,10 +537,8 @@ async function start() {
                             } else {
                                 document.getElementById("message").textContent = `Your available moves are ${avail}`;
                                 console.log(click_cnt, click_pos);
-                                if (click_cnt != 1) {
-                                  await new Promise(resolve => setTimeout(resolve, 100));
-                                  continue;
-                                } 
+                                display();
+                                await shortWait(1);
                                 const start = click_pos;
                                 if (!checkStart(start)) {
                                     click_cnt = 0;
@@ -556,12 +549,11 @@ async function start() {
                                     click_cnt = 0;
                                     continue;
                                 }
-                                while (click_cnt != 0) {
-                                  await new Promise(resolve => setTimeout(resolve, 100));
-                                } 
+                                display();
+                                await shortWait(0);
                                 const end = click_pos;
                                 let step = end - start;
-                                if (end == 25) {
+                                if (end === 25) {
                                     let minStep = step + 6;
                                     for (let a of avail) {
                                       if ((a >= step) && (a < minStep)) {
@@ -609,7 +601,7 @@ async function start() {
                                         alert("You can not bear off");
                                         continue;
                                     }
-                                    if ((start != furthest + 1) && (start + step - 1 != 24)) {
+                                    if ((start !== furthest + 1) && (start + step - 1 !== 24)) {
                                         alert("You can not bear off this one");
                                         continue;
                                     }
@@ -633,19 +625,16 @@ async function start() {
                             if (midBoard[1] > 0) {
                                 document.getElementById("message").textContent = `Your available moves are ${avail}`;
                                 console.log(click_cnt, click_pos);
-                                if (click_cnt != 1) {
-                                  await new Promise(resolve => setTimeout(resolve, 100));
-                                  continue;
-                                } 
+                                display();
+                                await shortWait(1);
                                 const start = click_pos;
-                                if (start != 25) {
+                                if (start !== 25) {
                                   alert("You should start from middle");
                                   click_cnt = 0;
                                   continue;
                                 }
-                                while (click_cnt != 0) {
-                                  await new Promise(resolve => setTimeout(resolve, 100));
-                                } 
+                                display();
+                                await shortWait(0);
                                 const step = 25 - click_pos;
                                 if (!checkStep(step)) {
                                     continue;
@@ -689,11 +678,8 @@ async function start() {
                             } else {
                                 document.getElementById("message").textContent = `Your available moves are ${avail}`;
                                 console.log(click_cnt, click_pos);
-
-                                if (click_cnt != 1) {
-                                  await new Promise(resolve => setTimeout(resolve, 100));
-                                  continue;
-                                } 
+                                display();
+                                await shortWait(1);
                                 const start = click_pos;
                                 if (!checkStart(start)) {
                                     click_cnt = 0;
@@ -704,12 +690,11 @@ async function start() {
                                   alert("There is no such checker");
                                   continue;
                                 }
-                                while (click_cnt != 0) {
-                                  await new Promise(resolve => setTimeout(resolve, 100));
-                                } 
+                                display();
+                                await shortWait(0);
                                 const end = click_pos;
                                 let step = start - end;
-                                if (end == 0) {
+                                if (end === 0) {
                                     let minStep = step + 6;
                                     for (let a of avail) {
                                       if ((a >= step) && (a < minStep)) {
@@ -753,7 +738,7 @@ async function start() {
                                         alert("You can not bear off");
                                         continue;
                                     }
-                                    if ((start != furthest + 1) && (start - step != 0)) {
+                                    if ((start !== furthest + 1) && (start - step !== 0)) {
                                         alert("You can not bear off this one");
                                         continue;
                                     }
@@ -791,17 +776,11 @@ async function start() {
                     });
                     await retry(new solana.Transaction().add(move));
                     console.log("saving moves");
-                    document.getElementById("message").textContent = `wait for the other player`;
+                    document.getElementById("message").textContent = `Wait for the other player`;
                 } else {
-                    document.getElementById("message").textContent = `wait for the other player`;
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    await longWait();
                 }
-                game_info = await getInfo();
-                if (checkBoard(game_info.data)) {
-                    display();
-                }
-                status = game_info.data[8];
-                turn = game_info.data[73] - 1;
+                await syncChain();
                 break;
         }
     }
@@ -817,11 +796,37 @@ async function start() {
 
 function move(slot) {
   return () => {
-    click_cnt = 1 - click_cnt;
-    click_pos = slot;
+    if (status === 3) {
+      click_cnt = 1 - click_cnt;
+      click_pos = slot;
+    } else {
+      click_cnt = 0;
+    }
+    display();
   }
 }
 
 function double() {
   doubled = true;
+  document.getElementById("double").style.background = "blue";
+}
+
+async function longWait() {
+  document.getElementById("message").textContent = "Wait for the other player";
+  await new Promise(resolve => setTimeout(resolve, 1000));
+}
+
+async function shortWait(x) {
+  while (click_cnt !== x) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+}
+
+async function syncChain() {
+  game_info = await getInfo();
+  if (checkBoard(game_info.data)) {
+      display();
+  }
+  status = game_info.data[8];
+  turn = game_info.data[73] - 1;
 }
