@@ -188,7 +188,7 @@ class Game extends React.Component {
     return (
       <div id="game">
         <button id="secret-key" onClick={start}>
-          start
+          Go
         </button>
         <div id="game-key">
           game public key: {game}
@@ -297,7 +297,7 @@ class Game extends React.Component {
           multiplier: {multiplier}
         </div>
         <button id="double" onClick={double}>
-              double
+              x2
         </button>
       </div>
     );
