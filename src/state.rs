@@ -98,18 +98,22 @@ impl Game {
         accept: bool,
         rdc: &mut dyn RandomDice,
     ) -> Result<(), ProgramError> {
+        msg!("player = {}", player.to_string());
+        msg!("turn = {}", self.turn.to_string());
         if self.state != GameState::Doubled {
-            msg!("The opponent has not responded to the double yet.");
+            msg!("The opponent has not responded to the double yet");
             return Err(BackgammonError::InvalidState.into());
         }
 
         if player != self.turn.opponent()? {
+            msg!("This player is not authorized to accept or reject the double");
             return Err(BackgammonError::UnauthorizedAction.into());
         }
 
         if accept {
             self.multiplier *= 2;
             self.last_doubled = self.turn;
+            self.turn = self.turn.opponent()?;
             self.roll_dice(player, rdc)?;
         } else {
             self.winner = self.turn;

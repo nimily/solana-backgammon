@@ -182,8 +182,9 @@ impl Processor {
         let mut game = Game::unpack_unchecked(&game_info.data.borrow())?;
         let rdc = &mut PdaRandomDice::new(program_id, &game);
 
-        let color = game.get_color(player_info.key);
-        game.respond_to_double(color, accept, rdc)?;
+        let player = game.get_color(player_info.key);
+        msg!("player = {}", player.to_string());
+        game.respond_to_double(player, accept, rdc)?;
 
         Game::incr_and_pack(game, &mut &mut game_info.data.borrow_mut()[..])
     }
